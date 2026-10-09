@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import cors from "cors";
 import { yf, cached, quotes, MIN } from "./yahoo.js";
-import { portfolioSnapshot, portfolioHistory, loadHoldings, upsertHolding, removeHolding } from "./portfolio.js";
+import { portfolioSnapshot, portfolioHistory, loadHoldings, saveHoldings, upsertHolding, removeHolding } from "./portfolio.js";
 import { stockDetail, stockReports } from "./stock.js";
 import { peerComparison } from "./peers.js";
 import { isSecDocument, SEC_HEADERS } from "./sec.js";
@@ -84,6 +84,37 @@ app.post("/api/portfolio", wrap(async (req) => {
   return upsertHolding({ symbol, shares, avgCost });
 }));
 app.delete("/api/portfolio/:symbol", wrap((req) => removeHolding(req.params.symbol)));
+
+// Replaces the whole portfolio (bulk import). Repeated symbols are merged with a
+// weighted average cost; every symbol must exist on Yahoo Finance.
+app.put("/api/portfolio", wrap(async (req) => {
+  const rows = Array.isArray(req.body?.holdings) ? req.body.holdings : [];
+  const merged = new Map();
+  for (const r of rows) {
+    const symbol = String(r.symbol ?? "").trim().toUpperCase();
+    const shares = Number(r.shares);
+    const avgCost = Number(r.avgCost);
+    if (!symbol || !(shares > 0) || !(avgCost >= 0)) {
+      throw Object.assign(new Error(`Fila inválida: ${JSON.stringify(r)}`), { status: 400 });
+    }
+    const prev = merged.get(symbol);
+    if (prev) {
+      const total = prev.shares + shares;
+      merged.set(symbol, { symbol, shares: total, avgCost: (prev.avgCost * prev.shares + avgCost * shares) / total });
+    } else {
+      merged.set(symbol, { symbol, shares, avgCost });
+    }
+  }
+  if (!merged.size) throw Object.assign(new Error("La lista está vacía"), { status: 400 });
+  const found = new Set((await quotes([...merged.keys()])).map((q) => q.symbol.toUpperCase()));
+  const missing = [...merged.keys()].filter((s) => !found.has(s));
+  if (missing.length) {
+    throw Object.assign(new Error(`No se encontraron en Yahoo Finance: ${missing.join(", ")}`), { status: 404 });
+  }
+  const holdings = [...merged.values()];
+  await saveHoldings(holdings);
+  return holdings;
+}));
 
 app.get("/api/stock/:symbol", wrap((req) => stockDetail(req.params.symbol)));
 app.get("/api/stock/:symbol/peers", wrap((req) => {

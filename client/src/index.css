@@ -438,3 +438,9 @@ table.compare .group-row td {
   .report-option { flex-direction: column; align-items: stretch; }
   .report { padding: 16px; }
 }
+
+/* Bulk import */
+.import-box { margin-bottom: 12px; padding: 12px; background: var(--layer-2); border: 1px solid var(--border-2); border-radius: var(--radius-sm); }
+.import-box textarea { width: 100%; font-family: var(--mono); font-size: 13px; line-height: 20px; resize: vertical; }
+.import-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.import-actions .small { margin-right: auto; }

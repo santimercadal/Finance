@@ -7,6 +7,7 @@ import MarketStrip from '../components/MarketStrip'
 import NewsList from '../components/NewsList'
 import ChartTip from '../components/ChartTip'
 import SymbolSearch from '../components/SymbolSearch'
+import ImportHoldings from '../components/ImportHoldings'
 
 const RANGES = { '1M': 30, '3M': 91, '6M': 182, '1A': 365 } as const
 type Range = keyof typeof RANGES
@@ -125,6 +126,7 @@ function Holdings({ p, reload }: { p: Portfolio; reload: () => void }) {
   const [cost, setCost] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [importing, setImporting] = useState(false)
 
   const add = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -149,7 +151,14 @@ function Holdings({ p, reload }: { p: Portfolio; reload: () => void }) {
 
   return (
     <section className="card">
-      <div className="card-head"><h2>Mis posiciones</h2><span className="small muted">Toca una posición para ver el análisis</span></div>
+      <div className="card-head">
+        <div><h2>Mis posiciones</h2><span className="small muted">Toca una posición para ver el análisis</span></div>
+        {!importing && <button className="btn ghost" onClick={() => setImporting(true)}>Importar lista</button>}
+      </div>
+      {importing && (
+        // Reload the page so the KPIs and the performance chart reflect the new holdings.
+        <ImportHoldings onDone={() => window.location.reload()} onCancel={() => setImporting(false)} />
+      )}
       <div className="table-wrap holdings-table">
         <table>
           <thead>
