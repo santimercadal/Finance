@@ -36,7 +36,7 @@ export default function NewsPage() {
           </div>
         ) : digest.data && !digest.data.ai ? (
           <div className="note" style={{ marginBottom: 8 }}>
-            Tip: configura <code>ANTHROPIC_API_KEY</code> en <code>server/.env</code> para obtener un resumen del día y resúmenes con IA en español.
+            Tip: configura <code>GROQ_API_KEY</code> (gratis en console.groq.com) para obtener un resumen del día y resúmenes con IA en español.
           </div>
         ) : null}
         {news.error && <div className="error">{news.error}</div>}

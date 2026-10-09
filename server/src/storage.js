@@ -37,9 +37,11 @@ export async function getJSON(key) {
   }
 }
 
-export async function setJSON(key, value) {
+export async function setJSON(key, value, ttlSeconds) {
   if (storageKind === "upstash") {
-    await redis(["SET", key, JSON.stringify(value)]);
+    const command = ["SET", key, JSON.stringify(value)];
+    if (ttlSeconds) command.push("EX", String(ttlSeconds));
+    await redis(command);
     return;
   }
   await fs.mkdir(DATA_DIR, { recursive: true });

@@ -20,6 +20,6 @@ services:
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
         sync: false
-      # Opcional: resúmenes de noticias con IA.
-      - key: ANTHROPIC_API_KEY
+      # Opcional y gratis: resúmenes de noticias con IA (https://console.groq.com).
+      - key: GROQ_API_KEY
         sync: false

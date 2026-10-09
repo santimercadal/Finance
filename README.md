@@ -13,7 +13,7 @@ Dashboard personal de inversiones con datos de mercado de Yahoo Finance. Se inst
   - *Deuda*: costo de la deuda (Kd), Kd después de impuestos, cobertura de intereses, deuda neta / EBITDA.
   - *Informes*: descarga del **informe trimestral oficial** (10-Q / 6-K ante la SEC), informe resumido en PDF y datos trimestrales en CSV para Excel.
   - *Noticias* del ticker.
-- **Noticias**: feed del portafolio + mercado con resúmenes (con IA si configuras la clave de Anthropic).
+- **Noticias**: feed del portafolio + mercado con resúmenes en español generados con IA gratuita (Groq), si configuras la clave.
 
 ## Uso local
 
@@ -36,7 +36,7 @@ La app necesita un servidor (consulta Yahoo Finance), así que GitHub guarda el 
 3. **Render**: crea una cuenta en https://render.com con tu GitHub → *New* → *Blueprint* → elige el repositorio. Render lee `render.yaml` y te pide:
    - `APP_PASSWORD`: la contraseña para entrar a la app (elige una segura: la app es pública en internet).
    - `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`: los del paso 2.
-   - `ANTHROPIC_API_KEY`: opcional, para resúmenes con IA.
+   - `GROQ_API_KEY`: opcional y gratis, para resúmenes con IA. Se obtiene en https://console.groq.com → *API Keys* (sin tarjeta).
 4. Al terminar el deploy, Render te da una URL `https://mi-portafolio-xxxx.onrender.com`.
 5. **En el teléfono**: abre la URL, ingresa la contraseña y usa *Agregar a pantalla de inicio* (Safari: botón compartir; Chrome Android: menú ⋮ → *Instalar app*).
 

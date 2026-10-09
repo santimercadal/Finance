@@ -8,7 +8,7 @@ import { yf, cached, quotes, MIN } from "./yahoo.js";
 import { portfolioSnapshot, portfolioHistory, loadHoldings, upsertHolding, removeHolding } from "./portfolio.js";
 import { stockDetail, stockReports } from "./stock.js";
 import { peerComparison } from "./peers.js";
-import { newsFeed, articleSummary, dailyDigest, aiEnabled } from "./news.js";
+import { newsFeed, articleSummary, dailyDigest, aiEnabled, aiProvider } from "./news.js";
 import { storageKind } from "./storage.js";
 
 const app = express();
@@ -51,7 +51,7 @@ const wrap = (fn) => async (req, res) => {
   }
 };
 
-app.get("/api/health", (_req, res) => res.json({ ok: true, ai: aiEnabled, auth: Boolean(PASSWORD), storage: storageKind }));
+app.get("/api/health", (_req, res) => res.json({ ok: true, ai: aiProvider, auth: Boolean(PASSWORD), storage: storageKind }));
 app.get("/api/auth/check", (_req, res) => res.json({ ok: true }));
 
 app.get("/api/market", wrap(async () => {
@@ -151,5 +151,5 @@ if (fs.existsSync(webDist)) {
 
 const PORT = Number(process.env.PORT) || 3001;
 app.listen(PORT, () => {
-  console.log(`API escuchando en http://localhost:${PORT} (resúmenes IA: ${aiEnabled ? "sí" : "no"})`);
+  console.log(`API escuchando en http://localhost:${PORT} (resúmenes IA: ${aiProvider ?? "no"})`);
 });
