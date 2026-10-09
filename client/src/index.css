@@ -452,7 +452,7 @@ table.compare .group-row td {
 .kpi-beta .stat .hint { font-size: 12px; line-height: 16px; }
 @media (max-width: 600px) { .kpi-beta .stat .value { font-size: 16px; line-height: 22px; } }
 .head-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
-.sync-msg { flex-basis: 100%; text-align: right; }
+.sync-msg { flex-basis: 100%; text-align: right; order: 1; }
 .type-chip { margin-left: 6px; font-size: 10px; vertical-align: middle; font-weight: 500; }
 .stock-head h1 .type-chip { font-size: 12px; vertical-align: 4px; }
 
