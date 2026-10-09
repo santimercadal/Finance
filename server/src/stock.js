@@ -1,4 +1,5 @@
-import { dailyCloses, optionalSummary } from "./yahoo.js";
+import { dailyCloses, optionalSummary, quotes, profileOf } from "./yahoo.js";
+import { fundIndicators } from "./etf.js";
 import { fundamentals, companySnapshot, num } from "./company.js";
 import { secFilings } from "./sec.js";
 
@@ -147,9 +148,45 @@ export async function stockReports(symbol) {
   };
 }
 
+const FUND_TYPES = new Set(["ETF", "MUTUALFUND", "CRYPTOCURRENCY"]);
+
+// ETFs and crypto have no financial statements: price-based indicators instead.
+async function fundDetail(symbol, quote, start) {
+  const [indicators, profile, chart] = await Promise.all([
+    fundIndicators(symbol, quote),
+    profileOf(symbol).catch(() => ({})),
+    dailyCloses(symbol, start).catch(() => []),
+  ]);
+  return {
+    symbol,
+    kind: indicators.kind,
+    quote: {
+      name: quote.longName || quote.shortName || profile.longname || symbol,
+      price: quote.regularMarketPrice,
+      change: quote.regularMarketChange,
+      changePct: quote.regularMarketChangePercent,
+      currency: quote.currency,
+      exchange: quote.fullExchangeName,
+      marketCap: null,
+      marketState: quote.marketState,
+      fiftyTwoWeekLow: quote.fiftyTwoWeekLow,
+      fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh,
+    },
+    profile: {},
+    keyStats: { financialCurrency: quote.currency },
+    balance: { latest: null, history: [] },
+    cashFlow: [],
+    debt: [],
+    chart,
+    fund: indicators,
+  };
+}
+
 export async function stockDetail(symbol) {
   symbol = symbol.toUpperCase();
   const start = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+  const [q] = await quotes([symbol]);
+  if (q && FUND_TYPES.has(q.quoteType)) return fundDetail(symbol, q, start);
   const [snap, extra, annual, quarterly, chart] = await Promise.all([
     companySnapshot(symbol),
     // Description and analyst consensus need Yahoo's crumb: present locally, may be missing on cloud hosts.
@@ -167,6 +204,7 @@ export async function stockDetail(symbol) {
 
   return {
     symbol,
+    kind: "equity",
     quote: {
       name: profile.name,
       price: quote.regularMarketPrice,

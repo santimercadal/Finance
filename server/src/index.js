@@ -10,7 +10,9 @@ import { stockDetail, stockReports } from "./stock.js";
 import { peerComparison } from "./peers.js";
 import { isSecDocument, SEC_HEADERS } from "./sec.js";
 import { newsFeed, articleSummary, dailyDigest, aiEnabled, aiProvider } from "./news.js";
-import { storageKind, storageWritable } from "./storage.js";
+import { storageKind, storageWritable, getJSON, setJSON } from "./storage.js";
+import { etoroEnabled, etoroHoldings } from "./etoro.js";
+import { analystView } from "./analysts.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -86,9 +88,9 @@ app.post("/api/portfolio", wrap(async (req) => {
 app.delete("/api/portfolio/:symbol", wrap((req) => removeHolding(req.params.symbol)));
 
 // Replaces the whole portfolio (bulk import). Repeated symbols are merged with a
-// weighted average cost; every symbol must exist on Yahoo Finance.
-app.put("/api/portfolio", wrap(async (req) => {
-  const rows = Array.isArray(req.body?.holdings) ? req.body.holdings : [];
+// weighted average cost; every symbol must exist on Yahoo Finance unless
+// `skipMissing` is set, in which case unknown symbols are left out and returned.
+async function replaceHoldings(rows, { skipMissing = false } = {}) {
   const merged = new Map();
   for (const r of rows) {
     const symbol = String(r.symbol ?? "").trim().toUpperCase();
@@ -108,13 +110,38 @@ app.put("/api/portfolio", wrap(async (req) => {
   if (!merged.size) throw Object.assign(new Error("La lista está vacía"), { status: 400 });
   const found = new Set((await quotes([...merged.keys()])).map((q) => q.symbol.toUpperCase()));
   const missing = [...merged.keys()].filter((s) => !found.has(s));
-  if (missing.length) {
+  if (missing.length && !skipMissing) {
     throw Object.assign(new Error(`No se encontraron en Yahoo Finance: ${missing.join(", ")}`), { status: 404 });
   }
-  const holdings = [...merged.values()];
+  const holdings = [...merged.values()].filter((h) => found.has(h.symbol));
+  if (!holdings.length) throw Object.assign(new Error("Ninguna posición se encontró en Yahoo Finance"), { status: 404 });
   await saveHoldings(holdings);
-  return holdings;
+  return { holdings, missing };
+}
+
+app.put("/api/portfolio", wrap(async (req) => {
+  const rows = Array.isArray(req.body?.holdings) ? req.body.holdings : [];
+  return (await replaceHoldings(rows)).holdings;
 }));
+
+// Replaces the portfolio with the open positions of the eToro real account.
+app.post("/api/portfolio/sync/etoro", wrap(async () => {
+  const { holdings: rows, skipped, shorts, cash } = await etoroHoldings();
+  if (!rows.length) throw Object.assign(new Error("La cuenta de eToro no tiene posiciones abiertas"), { status: 404 });
+  const { holdings, missing } = await replaceHoldings(rows, { skipMissing: true });
+  const names = new Map(rows.map((r) => [r.symbol, r.name]));
+  await setJSON("etoro-last-sync", { at: new Date().toISOString(), count: holdings.length }).catch(() => {});
+  return {
+    count: holdings.length,
+    skipped: [...skipped, ...missing.map((s) => `${names.get(s) ?? s} (${s})`)],
+    shorts,
+    cash,
+  };
+}));
+app.get("/api/portfolio/sync/etoro", wrap(async () => ({
+  enabled: etoroEnabled,
+  lastSync: await getJSON("etoro-last-sync").catch(() => null),
+})));
 
 app.get("/api/stock/:symbol", wrap((req) => stockDetail(req.params.symbol)));
 app.get("/api/stock/:symbol/peers", wrap((req) => {
@@ -122,6 +149,14 @@ app.get("/api/stock/:symbol/peers", wrap((req) => {
   return peerComparison(req.params.symbol, extra);
 }));
 app.get("/api/stock/:symbol/reports", wrap((req) => stockReports(req.params.symbol)));
+app.get("/api/stock/:symbol/analysts", wrap((req) => analystView(req.params.symbol)));
+
+// Analysts' pros and cons for every holding that has coverage.
+app.get("/api/analysts", wrap(async () => {
+  const symbols = (await loadHoldings()).map((h) => h.symbol);
+  const views = await Promise.all(symbols.map((s) => analystView(s)));
+  return views.filter(Boolean);
+}));
 
 // Downloads an SEC filing document. Only the SEC archive is allowed, so this
 // can't be used to fetch arbitrary URLs through the server.

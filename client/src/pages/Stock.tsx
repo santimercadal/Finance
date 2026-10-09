@@ -4,16 +4,20 @@ import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, ComposedChart, Line, LineChart,
   ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { useApi, type BalanceRow, type NewsItem, type PeerComparison, type StockDetail } from '../api'
+import { useApi, type AnalystView, type BalanceRow, type NewsItem, type PeerComparison, type StockDetail } from '../api'
 import { compact, money, num, pct, scoreClass, tone, year } from '../format'
 import ChartTip from '../components/ChartTip'
 import NewsList from '../components/NewsList'
 import MetricStat, { PeerContext } from '../components/MetricStat'
 import Competition from '../components/Competition'
 import ReportsPanel from '../components/ReportsPanel'
+import FundOverview from '../components/FundOverview'
+import AnalystCard from '../components/AnalystCard'
 
 const TABS = ['Resumen', 'Competencia', 'Estructura patrimonial', 'Flujo de fondos', 'Deuda', 'Informes', 'Noticias'] as const
 type Tab = (typeof TABS)[number]
+// ETFs and crypto have no financial statements or industry peers.
+const FUND_TABS: readonly Tab[] = ['Resumen', 'Noticias']
 
 function SeriesLegend({ items }: { items: [string, string][] }) {
   return (
@@ -45,9 +49,6 @@ const axis ={ tick: { fill: 'var(--muted)', fontSize: 11 }, tickLine: false }
 
 
 function Overview({ d }: { d: StockDetail }) {
-  const [open, setOpen] = useState(false)
-  const k = d.keyStats
-  const n = (key: string) => (typeof k[key] === 'number' ? (k[key] as number) : null)
   const first = d.chart[0]?.close
   const last = d.chart.at(-1)?.close
   const up = first && last ? last >= first : true
@@ -77,6 +78,28 @@ function Overview({ d }: { d: StockDetail }) {
           </ResponsiveContainer>
         </div>
       </section>
+      {d.fund ? <FundOverview d={d} f={d.fund} /> : <EquityOverview d={d} />}
+    </div>
+  )
+}
+
+function StockAnalysts({ symbol, currency }: { symbol: string; currency: string }) {
+  const { data } = useApi<AnalystView | null>(`/stock/${encodeURIComponent(symbol)}/analysts`)
+  if (!data) return null
+  return (
+    <section className="card">
+      <div className="card-head"><h2>Pros y contras según analistas</h2></div>
+      <AnalystCard a={data} currency={currency} />
+    </section>
+  )
+}
+
+function EquityOverview({ d }: { d: StockDetail }) {
+  const [open, setOpen] = useState(false)
+  const k = d.keyStats
+  const n = (key: string) => (typeof k[key] === 'number' ? (k[key] as number) : null)
+  return (
+    <>
       <section className="card">
         <div className="card-head"><h2>Indicadores clave</h2></div>
         <div className="stats">
@@ -109,7 +132,8 @@ function Overview({ d }: { d: StockDetail }) {
           <button className="btn ghost" style={{ marginTop: 8 }} onClick={() => setOpen(!open)}>{open ? 'Ver menos' : 'Ver más'}</button>
         </section>
       )}
-    </div>
+      <StockAnalysts symbol={d.symbol} currency={d.quote.currency} />
+    </>
   )
 }
 
@@ -416,7 +440,9 @@ export default function StockPage() {
 function StockView({ symbol }: { symbol: string }) {
   const { data: d, error, loading } = useApi<StockDetail>(`/stock/${encodeURIComponent(symbol)}`)
   const [extraPeers, setExtraPeers] = useState<string[]>([])
-  const peersPath = `/stock/${encodeURIComponent(symbol)}/peers${extraPeers.length ? `?add=${extraPeers.join(',')}` : ''}`
+  const peersPath = d?.kind === 'equity'
+    ? `/stock/${encodeURIComponent(symbol)}/peers${extraPeers.length ? `?add=${extraPeers.join(',')}` : ''}`
+    : null
   const peers = useApi<PeerComparison>(peersPath)
   const [tab, setTab] = useState<Tab>('Resumen')
 
@@ -435,7 +461,7 @@ function StockView({ symbol }: { symbol: string }) {
           <>
             <div className="stock-head">
               <div>
-                <h1>{d.quote.name} <span className="ticker-sym">{d.symbol}</span></h1>
+                <h1>{d.quote.name} <span className="ticker-sym">{d.symbol}</span>{d.kind !== 'equity' && <span className="chip type-chip">{d.kind === 'etf' ? 'ETF' : 'Cripto'}</span>}</h1>
                 <div className="small muted">{d.quote.exchange} · {d.quote.currency}{d.quote.marketState !== 'REGULAR' && ' · Mercado cerrado'}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -451,7 +477,7 @@ function StockView({ symbol }: { symbol: string }) {
               </div>
             </div>
             <div className="tabs" role="tablist">
-              {TABS.map((t) => (
+              {(d.kind === 'equity' ? TABS : FUND_TABS).map((t) => (
                 <button key={t} role="tab" aria-selected={t === tab} className={t === tab ? 'on' : ''} onClick={() => setTab(t)}>{t}</button>
               ))}
             </div>

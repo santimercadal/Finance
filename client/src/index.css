@@ -444,3 +444,35 @@ table.compare .group-row td {
 .import-box textarea { width: 100%; font-family: var(--mono); font-size: 13px; line-height: 20px; resize: vertical; }
 .import-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .import-actions .small { margin-right: auto; }
+
+/* ---------- Portfolio beta, eToro sync, asset type ---------- */
+.kpi-beta .stat { background: none; border: 0; padding: 0; }
+.kpi-beta .stat-label { text-transform: uppercase; letter-spacing: 0.04em; }
+.kpi-beta .stat .value { font-size: 20px; line-height: 26px; margin-top: 4px; }
+.kpi-beta .stat .hint { font-size: 12px; line-height: 16px; }
+@media (max-width: 600px) { .kpi-beta .stat .value { font-size: 16px; line-height: 22px; } }
+.head-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.sync-msg { flex-basis: 100%; text-align: right; }
+.type-chip { margin-left: 6px; font-size: 10px; vertical-align: middle; font-weight: 500; }
+.stock-head h1 .type-chip { font-size: 12px; vertical-align: 4px; }
+
+/* ---------- News below positions ---------- */
+@media (min-width: 900px) {
+  .news-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 20px; align-items: start; }
+  .news-layout > :only-child { grid-column: 1 / -1; }
+}
+
+/* ---------- Analysts' pros and cons ---------- */
+.analyst + .analyst { border-top: 1px solid var(--border-1); padding-top: 16px; margin-top: 16px; }
+.analyst-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 15px; }
+.analyst-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.pros-cons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 12px; }
+@media (max-width: 700px) { .pros-cons { grid-template-columns: minmax(0, 1fr); gap: 10px; } }
+.pros-cons h3 { margin-bottom: 6px; }
+.pros-cons ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13px; line-height: 19px; color: var(--text-2); }
+.analyst-list summary { cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 10px 0; list-style: none; }
+.analyst-list summary::-webkit-details-marker { display: none; }
+.analyst-list summary::after { content: '▾'; margin-left: auto; color: var(--muted); }
+.analyst-list details[open] summary::after { content: '▴'; }
+.analyst-list details { border-bottom: 1px solid var(--border-1); }
+.analyst-list details > .analyst { padding-bottom: 12px; }

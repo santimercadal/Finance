@@ -42,6 +42,12 @@ function chartQuote(symbol) {
     const open = regular && now >= new Date(regular.start).getTime() && now <= new Date(regular.end).getTime();
     return {
       symbol: m.symbol ?? symbol,
+      // EQUITY, ETF, CRYPTOCURRENCY, INDEX, MUTUALFUND, CURRENCY, FUTURE…
+      quoteType: m.instrumentType ?? null,
+      // The library may already convert it to a Date; otherwise it's epoch seconds.
+      firstTradeDate: m.firstTradeDate
+        ? (m.firstTradeDate instanceof Date ? m.firstTradeDate : new Date(m.firstTradeDate * 1000)).toISOString().slice(0, 10)
+        : null,
       shortName: m.shortName,
       longName: m.longName,
       currency: m.currency,
@@ -79,6 +85,30 @@ export async function optionalSummary(symbol, modules) {
     if (/crumb|429|401/i.test(err.message)) blockCrumb();
     return {};
   }
+}
+
+// Yahoo's research insights (no crumb needed): Morningstar bull/bear case,
+// Argus rating and target, Trading Central technical outlook. Stocks only.
+export function insights(symbol) {
+  return cached(`insights:${symbol}`, 6 * HOUR, async () => {
+    const url = `https://query2.finance.yahoo.com/ws/insights/v2/finance/insights?symbol=${encodeURIComponent(symbol)}`;
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error(`Yahoo insights HTTP ${res.status}`);
+    return (await res.json())?.finance?.result ?? {};
+  });
+}
+
+// Price history with dividends, for fund/crypto indicators.
+export function dailyHistory(symbol, period1) {
+  return cached(`hist:${symbol}:${period1}`, HOUR, async () => {
+    const c = await yf.chart(symbol, { period1, interval: "1d", events: "div" }, { validateResult: false });
+    return {
+      closes: c.quotes
+        .filter((q) => q.close != null)
+        .map((q) => ({ date: new Date(q.date).toISOString().slice(0, 10), close: q.adjclose ?? q.close, price: q.close })),
+      dividends: (c.events?.dividends ?? []).map((d) => ({ date: new Date(d.date).toISOString().slice(0, 10), amount: d.amount })),
+    };
+  });
 }
 
 // Search result for a symbol: name, sector and industry.

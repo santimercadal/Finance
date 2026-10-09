@@ -23,3 +23,8 @@ services:
       # Opcional y gratis: resúmenes de noticias con IA (https://console.groq.com).
       - key: GROQ_API_KEY
         sync: false
+      # Opcional: sincronizar el portafolio con eToro (claves de solo lectura).
+      - key: ETORO_API_KEY
+        sync: false
+      - key: ETORO_USER_KEY
+        sync: false

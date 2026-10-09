@@ -1,5 +1,4 @@
 import { yf, cached, quotes, fxPerUsd, profileOf, financialCurrency, HOUR } from "./yahoo.js";
-
 export const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const div = (a, b) => (num(a) != null && num(b) ? a / b : null);
 const pct = (a, b) => (div(a, b) != null ? (a / b) * 100 : null);
@@ -43,20 +42,26 @@ function beta(stock, index) {
   return varM ? cov / varM : null;
 }
 
+// Beta like Yahoo: 5 years of monthly returns against the S&P 500.
+export function betaOf(symbol) {
+  const start = new Date(Date.now() - 5 * 365 * 864e5).toISOString().slice(0, 10);
+  return cached(`beta:${symbol}:${start.slice(0, 7)}`, 12 * HOUR, async () => {
+    const [closes, index] = await Promise.all([monthlyCloses(symbol, start), monthlyCloses("^GSPC", start)]);
+    return beta(closes, index);
+  }).catch(() => null);
+}
+
 // Quote, profile and valuation/profitability/health metrics for one company,
 // computed from statements so it works without Yahoo's crumb-protected APIs.
 export function companySnapshot(symbol) {
   symbol = symbol.toUpperCase();
   return cached(`snap:${symbol}`, 30 * 60_000, async () => {
-    // Beta like Yahoo: 5 years of monthly returns against the S&P 500.
-    const start = new Date(Date.now() - 5 * 365 * 864e5).toISOString().slice(0, 10);
-    const [[quote], profile, ttmRows, quarterly, closes, index, finCur] = await Promise.all([
+    const [[quote], profile, ttmRows, quarterly, betaValue, finCur] = await Promise.all([
       quotes([symbol]),
       profileOf(symbol).catch(() => ({})),
       fundamentals(symbol, "trailing").catch(() => []),
       fundamentals(symbol, "quarterly").catch(() => []),
-      monthlyCloses(symbol, start).catch(() => []),
-      monthlyCloses("^GSPC", start).catch(() => []),
+      betaOf(symbol),
       financialCurrency(symbol),
     ]);
     if (!quote) {
@@ -128,15 +133,14 @@ export function companySnapshot(symbol) {
         currentRatio: div(bs.currentAssets, bs.currentLiabilities),
         quickRatio: div(num(bs.currentAssets) != null ? bs.currentAssets - (num(bs.inventory) ?? 0) : null, bs.currentLiabilities),
         dividendYield: dividends != null && marketCap ? (Math.abs(conv(dividends)) / marketCap) * 100 : 0,
-        beta: beta(closes, index),
+        beta: betaValue,
       },
     };
   });
 }
 
 function monthlyCloses(symbol, period1) {
-  return cached(`monthly:${symbol}:${period1.slice(0, 7)}`, 12 * HOUR, async () => {
-    const c = await yf.chart(symbol, { period1, interval: "1mo" }, { validateResult: false });
+  return cached(`monthly:${symbol}:${period1.slice(0, 7)}`, 12 * HOUR, async () => {    const c = await yf.chart(symbol, { period1, interval: "1mo" }, { validateResult: false });
     return c.quotes
       .filter((q) => q.close != null)
       .map((q) => ({ date: new Date(q.date).toISOString().slice(0, 7), close: q.adjclose ?? q.close }));

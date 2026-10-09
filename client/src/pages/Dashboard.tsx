@@ -8,6 +8,7 @@ import NewsList from '../components/NewsList'
 import ChartTip from '../components/ChartTip'
 import SymbolSearch from '../components/SymbolSearch'
 import ImportHoldings from '../components/ImportHoldings'
+import MetricStat from '../components/MetricStat'
 
 const RANGES = { '1M': 30, '3M': 91, '6M': 182, '1A': 365 } as const
 type Range = keyof typeof RANGES
@@ -42,8 +43,17 @@ function Kpis({ p }: { p: Portfolio }) {
           <span className={`num ${tone(t.worst?.pct)}`}>{pct(t.worst?.pct)}</span>
         </div>
       </div>
+      <div className="kpi kpi-beta">
+        <MetricStat id="portfolioBeta" label="Beta del portafolio" value={num(t.beta, 2)}
+          hint={betaLabel(t.beta) + (t.betaCoverage != null && t.betaCoverage < 99.5 ? ` · ${num(t.betaCoverage, 0)}% del valor` : '')} />
+      </div>
     </div>
   )
+}
+
+function betaLabel(beta: number | null) {
+  if (beta == null) return 'Sin datos'
+  return beta < 0.8 ? 'Defensivo' : beta <= 1.2 ? 'Similar al mercado' : 'Agresivo'
 }
 
 function PerformanceChart() {
@@ -153,7 +163,10 @@ function Holdings({ p, reload }: { p: Portfolio; reload: () => void }) {
     <section className="card">
       <div className="card-head">
         <div><h2>Mis posiciones</h2><span className="small muted">Toca una posición para ver el análisis</span></div>
-        {!importing && <button className="btn ghost" onClick={() => setImporting(true)}>Importar lista</button>}
+        <div className="head-actions">
+          <EtoroSync />
+          {!importing && <button className="btn ghost" onClick={() => setImporting(true)}>Importar lista</button>}
+        </div>
       </div>
       {importing && (
         // Reload the page so the KPIs and the performance chart reflect the new holdings.
@@ -170,7 +183,7 @@ function Holdings({ p, reload }: { p: Portfolio; reload: () => void }) {
           <tbody>
             {p.holdings.map((h) => (
               <tr key={h.symbol} className="click" onClick={() => navigate(`/accion/${encodeURIComponent(h.symbol)}`)}>
-                <td><div className="sym">{h.symbol}</div><div className="name">{h.name}</div></td>
+                <td><div className="sym">{h.symbol}<TypeChip type={h.type} /></div><div className="name">{h.name}</div></td>
                 <td>{money(h.price, h.currency)}</td>
                 <td className={tone(h.dayChangePct)}>{pct(h.dayChangePct)}</td>
                 <td>{num(h.shares, h.shares % 1 ? 4 : 0)}</td>
@@ -192,6 +205,7 @@ function Holdings({ p, reload }: { p: Portfolio; reload: () => void }) {
             <div style={{ minWidth: 0 }}>
               <div className="sym">
                 {h.symbol}
+                <TypeChip type={h.type} />
                 <button className="icon-btn" aria-label={`Quitar ${h.symbol}`} onClick={(e) => { e.stopPropagation(); remove(h.symbol) }}>✕</button>
               </div>
               <div className="name">{h.name}</div>
@@ -217,6 +231,70 @@ function Holdings({ p, reload }: { p: Portfolio; reload: () => void }) {
       <div className="note">Los valores en otras monedas se convierten a USD al tipo de cambio actual. El costo promedio se ingresa en la moneda del activo.</div>
     </section>
   )
+}
+
+function TypeChip({ type }: { type: string | null }) {
+  const label = type === 'ETF' ? 'ETF' : type === 'CRYPTOCURRENCY' ? 'Cripto' : null
+  return label ? <span className="chip type-chip">{label}</span> : null
+}
+
+interface SyncStatus { enabled: boolean; lastSync: { at: string; count: number } | null }
+interface SyncResult { count: number; skipped: string[]; shorts: number; cash: number | null }
+
+// Replaces the portfolio with the open positions of the eToro account (read-only
+// API keys configured on the server).
+function EtoroSync() {
+  const status = useApi<SyncStatus>('/portfolio/sync/etoro')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ text: string; error?: boolean } | null>(null)
+
+  const sync = async () => {
+    if (!status.data?.enabled) {
+      setMsg({ text: 'Falta configurar las claves de eToro en el servidor (ETORO_API_KEY y ETORO_USER_KEY). Ver README.', error: true })
+      return
+    }
+    if (!confirm('¿Reemplazar el portafolio con tus posiciones abiertas de eToro?')) return
+    setBusy(true)
+    setMsg(null)
+    try {
+      const r = await api<SyncResult>('/portfolio/sync/etoro', { method: 'POST' })
+      const extra = [
+        r.skipped.length ? `sin datos en Yahoo: ${r.skipped.join(', ')}` : '',
+        r.shorts ? `${r.shorts} posición(es) en corto omitidas` : '',
+      ].filter(Boolean).join(' · ')
+      sessionStorageSet('etoro-sync-msg', `Sincronizado: ${r.count} posiciones${extra ? ` (${extra})` : ''}.`)
+      // Reload so the KPIs and the performance chart reflect the new holdings.
+      window.location.reload()
+    } catch (e) {
+      setMsg({ text: (e as Error).message, error: true })
+      setBusy(false)
+    }
+  }
+
+  const [done] = useState(() => sessionStorageTake('etoro-sync-msg'))
+  const last = status.data?.lastSync
+  return (
+    <>
+      <button className="btn ghost" onClick={sync} disabled={busy}
+        title={last ? `Última sincronización: ${new Date(last.at).toLocaleString('es')}` : 'Trae tus posiciones abiertas de eToro'}>
+        {busy ? 'Sincronizando…' : '⟳ Sincronizar eToro'}
+      </button>
+      {(msg || done) && <div className={`sync-msg small ${msg?.error ? 'error' : 'muted'}`}>{msg?.text ?? done}</div>}
+    </>
+  )
+}
+
+function sessionStorageSet(key: string, value: string) {
+  try { sessionStorage.setItem(key, value) } catch { /* storage unavailable */ }
+}
+function sessionStorageTake(key: string) {
+  try {
+    const v = sessionStorage.getItem(key)
+    sessionStorage.removeItem(key)
+    return v
+  } catch {
+    return null
+  }
 }
 
 // 48×24 trend line of the last month; color encodes direction (also shown by the % badge).
@@ -254,17 +332,15 @@ export default function Dashboard() {
       <MarketStrip />
       {portfolio.error && <div className="error">No se pudo cargar el portafolio: {portfolio.error}</div>}
       {portfolio.data && <Kpis p={portfolio.data} />}
-      <div className="grid-2">
-        <div style={{ display: 'grid', gap: 20, minWidth: 0, alignContent: 'start' }}>
-          <PerformanceChart />
-          {portfolio.data && <Holdings p={portfolio.data} reload={portfolio.reload} />}
-        </div>
-        <section className="card" style={{ alignSelf: 'start' }}>
-          <div className="card-head"><h2>Noticias de tu portafolio</h2><Link to="/noticias" className="small">Ver todas →</Link></div>
+      <PerformanceChart />
+      {portfolio.data && <Holdings p={portfolio.data} reload={portfolio.reload} />}
+      <section className="card">
+        <div className="card-head"><h2>Noticias de tu portafolio</h2><Link to="/noticias" className="small">Ver todas →</Link></div>
+        <div className="news-layout">
           <NewsDigest />
           {news.data ? <NewsList items={news.data} /> : <div className="skeleton" style={{ height: 200 }} />}
-        </section>
-      </div>
+        </div>
+      </section>
     </main>
   )
 }

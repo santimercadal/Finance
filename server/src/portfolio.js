@@ -1,5 +1,6 @@
 import { quotes, dailyCloses, fxPerUsd } from "./yahoo.js";
 import { getJSON, setJSON } from "./storage.js";
+import { betaOf } from "./company.js";
 
 const DEFAULT_HOLDINGS = [
   { symbol: "AAPL", shares: 10, avgCost: 180 },
@@ -49,9 +50,10 @@ export async function portfolioSnapshot() {
   const rows = await Promise.all(
     holdings.map(async (h) => {
       const q = bySym[h.symbol] ?? {};
-      const [fx, closes] = await Promise.all([
+      const [fx, closes, beta] = await Promise.all([
         fxPerUsd(q.currency),
         dailyCloses(h.symbol, sparkStart).catch(() => []),
+        betaOf(h.symbol),
       ]);
       const price = q.regularMarketPrice ?? null;
       const prev = q.regularMarketPreviousClose ?? price;
@@ -61,6 +63,8 @@ export async function portfolioSnapshot() {
         ...h,
         name: q.shortName || q.longName || h.symbol,
         currency: q.currency || "USD",
+        type: q.quoteType ?? null,
+        beta,
         price,
         dayChangePct: q.regularMarketChangePercent ?? null,
         dayChangeUsd: price != null ? ((price - prev) * h.shares) / fx : 0,
@@ -83,6 +87,11 @@ export async function portfolioSnapshot() {
   const best = rows.reduce((b, r) => (r.dayChangePct != null && (!b || r.dayChangePct > b.dayChangePct) ? r : b), null);
   const worst = rows.reduce((w, r) => (r.dayChangePct != null && (!w || r.dayChangePct < w.dayChangePct) ? r : w), null);
 
+  // Portfolio beta = value-weighted average of each holding's beta, over the
+  // holdings that have one (coverage = share of the portfolio value included).
+  const withBeta = rows.filter((r) => r.beta != null && r.valueUsd);
+  const betaValue = withBeta.reduce((s, r) => s + r.valueUsd, 0);
+
   return {
     holdings: rows,
     totals: {
@@ -94,6 +103,8 @@ export async function portfolioSnapshot() {
       dayChangePct: totalValue - dayChange ? (dayChange / (totalValue - dayChange)) * 100 : null,
       best: best && { symbol: best.symbol, pct: best.dayChangePct },
       worst: worst && { symbol: worst.symbol, pct: worst.dayChangePct },
+      beta: betaValue ? withBeta.reduce((s, r) => s + r.beta * r.valueUsd, 0) / betaValue : null,
+      betaCoverage: totalValue ? (betaValue / totalValue) * 100 : null,
     },
   };
 }

@@ -242,4 +242,69 @@ export const METRICS: Record<string, MetricInfo> = {
     use: 'Qué parte de los activos se financia con deuda que paga intereses.',
     comparable: true, better: 'low',
   },
+  portfolioBeta: {
+    name: 'Beta del portafolio',
+    what: 'Promedio de la beta de cada posición, ponderado por su peso en el portafolio. Cada beta se calcula con 5 años de rendimientos mensuales contra el S&P 500.',
+    use: 'Indica cuánto se mueve tu portafolio cuando se mueve el mercado: con beta 1,2, si el S&P 500 cae 10% tu portafolio tiende a caer alrededor de 12%.',
+    ref: 'Menos de 0,8 es defensivo; entre 0,8 y 1,2 se mueve parecido al mercado; más de 1,2 es agresivo.',
+  },
+  // ETF / cripto
+  assetBeta: {
+    name: 'Beta',
+    what: 'Sensibilidad del activo a los movimientos del S&P 500 (= 1), con 5 años de rendimientos mensuales.',
+    use: 'Mide el riesgo de mercado: beta 1,5 suele moverse un 50% más que el índice; beta 0,5, la mitad.',
+  },
+  expenseRatio: {
+    name: 'Costo anual (TER)',
+    what: 'Porcentaje del patrimonio que el fondo cobra cada año para cubrir sus gastos. Se descuenta del precio, no se paga aparte.',
+    use: 'Es el costo seguro de tener el ETF: entre dos fondos que replican lo mismo, conviene el más barato.',
+    ref: 'Los ETF de índices amplios cuestan menos de 0,10%; los temáticos o de nicho suelen superar 0,40%.',
+  },
+  fundAssets: {
+    name: 'Patrimonio del fondo (AUM)',
+    what: 'Valor total de los activos que administra el ETF.',
+    use: 'Un fondo grande suele tener más liquidez, spreads más chicos y menos riesgo de que lo cierren.',
+  },
+  totalReturn: {
+    name: 'Rendimiento total',
+    what: 'Variación del precio incluyendo los dividendos reinvertidos. Los plazos de 3 y 5 años se muestran anualizados.',
+    use: 'Es la ganancia real que tuvo el fondo en cada período. Compáralo con el S&P 500 para ver si te convino frente al índice.',
+  },
+  volatility: {
+    name: 'Volatilidad (1 año)',
+    what: 'Desvío estándar anualizado de los rendimientos diarios del último año.',
+    use: 'Mide cuánto oscila el precio. A mayor volatilidad, más amplias las subas y bajas que hay que tolerar.',
+    ref: 'El S&P 500 suele estar entre 12% y 20%. Las cripto, por encima de 40%.',
+  },
+  maxDrawdown: {
+    name: 'Caída máxima',
+    what: 'La mayor caída desde un máximo hasta un mínimo posterior dentro del período.',
+    use: 'Muestra el peor momento que habría vivido alguien que compró en el pico. Sirve para medir si podrías tolerar ese riesgo.',
+  },
+  correlation: {
+    name: 'Correlación con el S&P 500',
+    what: 'Qué tan parecidos son los movimientos diarios del activo y del S&P 500 en el último año (de −1 a 1).',
+    use: 'Cerca de 1 el activo se mueve como el mercado y aporta poca diversificación; cerca de 0 se mueve por su cuenta.',
+  },
+  sharpe: {
+    name: 'Ratio de Sharpe (1 año)',
+    what: '(Rendimiento del último año − tasa libre de riesgo) / volatilidad. La tasa libre de riesgo es la Letra del Tesoro de EE.UU. a 13 semanas.',
+    use: 'Mide cuánto rendimiento extra obtuviste por cada unidad de riesgo asumido.',
+    ref: 'Mayor a 1 es bueno; negativo significa que rindió menos que un bono sin riesgo.',
+  },
+  fundYield: {
+    name: 'Rendimiento por dividendos',
+    what: 'Dividendos pagados en los últimos 12 meses divididos por el precio actual.',
+    use: 'Cuánto efectivo distribuye el fondo por año sobre lo que pagas.',
+  },
+  divFrequency: {
+    name: 'Frecuencia de pago',
+    what: 'Cada cuánto distribuye dividendos el fondo, según los pagos de los últimos 3 años.',
+    use: 'Útil si buscas un flujo de ingresos regular.',
+  },
+  inception: {
+    name: 'Cotiza desde',
+    what: 'Primer día de cotización del activo según Yahoo Finance.',
+    use: 'Un historial más largo da más confianza a los indicadores de riesgo y rendimiento.',
+  },
 }

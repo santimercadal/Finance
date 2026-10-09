@@ -194,8 +194,8 @@ export function dailyDigest(news) {
   return cached(key, 30 * MIN, () =>
     askAI(
       "Eres un analista financiero que escribe un briefing de mercado breve en español.",
-      `Con estos titulares, escribe un resumen del día en 3 a 5 viñetas cortas de una o dos oraciones (empezando con "- "): qué está moviendo al mercado y qué eventos próximos conviene seguir. Básate sólo en lo que dicen los titulares, sin interpretar más allá de ellos, y no des recomendaciones de compra, venta ni de cómo posicionarse.\n\n${headlines}`,
-    ),
+      `Con estos titulares, escribe un resumen del día en 3 a 5 viñetas cortas de una o dos oraciones (empezando con "- "): qué está moviendo al mercado y qué eventos próximos conviene seguir. Básate sólo en lo que dicen los titulares, sin interpretar más allá de ellos, y no des recomendaciones de compra, venta ni de cómo posicionarse. Texto plano, sin markdown.\n\n${headlines}`,
+    ).then((text) => text && text.replace(/\*\*|__/g, "")),
   ).catch((err) => {
     console.error("AI digest failed:", err.message);
     return null;

@@ -15,6 +15,8 @@ export interface Holding {
   avgCost: number
   name: string
   currency: string
+  type: string | null
+  beta: number | null
   price: number | null
   dayChangePct: number | null
   dayChangeUsd: number
@@ -37,6 +39,8 @@ export interface Portfolio {
     dayChangePct: number | null
     best: { symbol: string; pct: number } | null
     worst: { symbol: string; pct: number } | null
+    beta: number | null
+    betaCoverage: number | null
   }
 }
 
@@ -113,8 +117,56 @@ export interface DebtRow {
   ebitda: number | null
 }
 
+export interface FundIndicators {
+  kind: 'etf' | 'crypto'
+  returns: Record<string, number | null>
+  risk: {
+    volatility: number | null
+    maxDrawdown1y: number | null
+    maxDrawdown5y: number | null
+    beta: number | null
+    correlation: number | null
+    sharpe: number | null
+    riskFree: number | null
+  }
+  dividends: {
+    yield: number | null
+    ttmAmount: number | null
+    frequency: string | null
+    last: { date: string; amount: number } | null
+  }
+  inception: string | null
+  fund: {
+    available: boolean
+    family: string | null
+    category: string | null
+    expenseRatio: number | null
+    totalAssets: number | null
+    holdings: { symbol: string; name: string; weight: number }[]
+    sectors: { sector: string; weight: number }[]
+  } | null
+}
+
+interface Outlook { direction: string; score: number | null }
+
+export interface AnalystView {
+  symbol: string
+  pros: string[]
+  cons: string[]
+  translated: boolean
+  prosConsSource: string | null
+  prosConsDate: string | null
+  rating: string | null
+  targetPrice: number | null
+  ratingSource: string | null
+  valuation: { label: string; discount: string | null; source: string } | null
+  outlook: { short: Outlook | null; mid: Outlook | null; long: Outlook | null; source: string | null } | null
+}
+
 export interface StockDetail {
   symbol: string
+  kind: 'equity' | 'etf' | 'crypto'
+  fund?: FundIndicators
   quote: {
     name: string
     price: number
