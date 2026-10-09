@@ -1,27 +1,12 @@
-import { yf, cached, quotes, dailyCloses, MIN, HOUR } from "./yahoo.js";
+import { dailyCloses, optionalSummary } from "./yahoo.js";
+import { fundamentals, companySnapshot, num } from "./company.js";
+import { secFilings } from "./sec.js";
 
-const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const div = (a, b) => (num(a) != null && num(b) ? a / b : null);
 const first = (row, ...keys) => {
   for (const k of keys) if (num(row?.[k]) != null) return row[k];
   return null;
 };
-
-function fundamentals(symbol, type) {
-  const years = type === "annual" ? 6 : 2;
-  const period1 = new Date(Date.now() - years * 365 * 864e5).toISOString().slice(0, 10);
-  return cached(`fts:${symbol}:${type}`, 6 * HOUR, async () => {
-    const rows = await yf.fundamentalsTimeSeries(
-      symbol,
-      { period1, type, module: "all" },
-      { validateResult: false },
-    );
-    return rows
-      .filter((r) => r.date)
-      .map((r) => ({ ...r, date: new Date(r.date).toISOString().slice(0, 10) }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-  });
-}
 
 function balance(r) {
   const totalAssets = first(r, "totalAssets");
@@ -111,15 +96,6 @@ function debtCost(rows) {
   });
 }
 
-const FILING_LABELS = {
-  "10-Q": "Informe trimestral (10-Q)",
-  "10-K": "Informe anual (10-K)",
-  "6-K": "Informe de emisor extranjero (6-K)",
-  "20-F": "Informe anual extranjero (20-F)",
-  "40-F": "Informe anual extranjero (40-F)",
-  "8-K": "Hecho relevante (8-K)",
-};
-
 // Line items exported in the quarterly report download, in display order.
 const QUARTERLY_ITEMS = [
   ["Ingresos", "totalRevenue"],
@@ -146,33 +122,18 @@ const QUARTERLY_ITEMS = [
 
 export async function stockReports(symbol) {
   symbol = symbol.toUpperCase();
-  const [summary, quarterly, [quote]] = await Promise.all([
-    cached(`filings:${symbol}`, 6 * HOUR, () =>
-      yf.quoteSummary(symbol, { modules: ["secFilings", "calendarEvents"] }, { validateResult: false }),
-    ).catch(() => ({})),
+  const [filings, quarterly, snap, extra] = await Promise.all([
+    secFilings(symbol).catch(() => []),
     fundamentals(symbol, "quarterly").catch(() => []),
-    quotes([symbol]),
+    companySnapshot(symbol),
+    optionalSummary(symbol, ["calendarEvents"]),
   ]);
-  const filings = (summary.secFilings?.filings ?? [])
-    .filter((f) => FILING_LABELS[f.type])
-    .slice(0, 20)
-    .map((f) => {
-      const main = f.exhibits?.find((e) => e.type === f.type) ?? f.exhibits?.[0];
-      return {
-        date: new Date(f.date ?? f.epochDate).toISOString().slice(0, 10),
-        type: f.type,
-        label: FILING_LABELS[f.type],
-        title: f.title,
-        documentUrl: main?.url ?? null,
-        viewUrl: f.edgarUrl ?? null,
-      };
-    });
   const quarters = quarterly.slice(-8);
-  const earningsDate = summary.calendarEvents?.earnings?.earningsDate?.[0];
+  const earningsDate = extra.calendarEvents?.earnings?.earningsDate?.[0];
   return {
     symbol,
-    name: quote?.longName || quote?.shortName || symbol,
-    currency: quote?.financialCurrency || quote?.currency,
+    name: snap.profile.name,
+    currency: snap.financialCurrency,
     nextEarnings: earningsDate ? new Date(earningsDate).toISOString().slice(0, 10) : null,
     filings,
     quarterly: {
@@ -189,29 +150,17 @@ export async function stockReports(symbol) {
 export async function stockDetail(symbol) {
   symbol = symbol.toUpperCase();
   const start = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
-  const [quote, summary, annual, quarterly, chart] = await Promise.all([
-    quotes([symbol]).then((q) => q[0]),
-    cached(`qs:${symbol}`, 30 * MIN, () =>
-      yf.quoteSummary(
-        symbol,
-        { modules: ["assetProfile", "financialData", "defaultKeyStatistics", "summaryDetail"] },
-        { validateResult: false },
-      ),
-    ).catch(() => ({})),
+  const [snap, extra, annual, quarterly, chart] = await Promise.all([
+    companySnapshot(symbol),
+    // Description and analyst consensus need Yahoo's crumb: present locally, may be missing on cloud hosts.
+    optionalSummary(symbol, ["assetProfile", "financialData"]),
     fundamentals(symbol, "annual").catch(() => []),
     fundamentals(symbol, "quarterly").catch(() => []),
     dailyCloses(symbol, start).catch(() => []),
   ]);
-  if (!quote) {
-    const err = new Error(`No se encontró el símbolo ${symbol}`);
-    err.status = 404;
-    throw err;
-  }
-
-  const fd = summary.financialData ?? {};
-  const ks = summary.defaultKeyStatistics ?? {};
-  const sd = summary.summaryDetail ?? {};
-  const ap = summary.assetProfile ?? {};
+  const { quote, profile, metrics } = snap;
+  const fd = extra.financialData ?? {};
+  const ap = extra.assetProfile ?? {};
 
   const annualBalances = annual.filter((r) => num(r.totalAssets) != null).map(balance);
   const latestQuarter = [...quarterly].reverse().find((r) => num(r.totalAssets) != null);
@@ -219,7 +168,7 @@ export async function stockDetail(symbol) {
   return {
     symbol,
     quote: {
-      name: quote.longName || quote.shortName || symbol,
+      name: profile.name,
       price: quote.regularMarketPrice,
       change: quote.regularMarketChange,
       changePct: quote.regularMarketChangePercent,
@@ -231,32 +180,19 @@ export async function stockDetail(symbol) {
       fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh,
     },
     profile: {
-      sector: ap.sector,
-      industry: ap.industry,
+      sector: profile.sector ?? ap.sector,
+      industry: profile.industry ?? ap.industry,
       country: ap.country,
       employees: ap.fullTimeEmployees,
       website: ap.website,
       description: ap.longBusinessSummary,
     },
     keyStats: {
-      pe: num(sd.trailingPE) ?? num(quote.trailingPE),
-      forwardPe: num(sd.forwardPE) ?? num(quote.forwardPE),
-      pb: num(ks.priceToBook),
-      evToEbitda: num(ks.enterpriseToEbitda),
-      dividendYield: num(sd.dividendYield) != null ? sd.dividendYield * 100 : null,
-      beta: num(sd.beta) ?? num(ks.beta),
-      roe: num(fd.returnOnEquity) != null ? fd.returnOnEquity * 100 : null,
-      roa: num(fd.returnOnAssets) != null ? fd.returnOnAssets * 100 : null,
-      grossMargin: num(fd.grossMargins) != null ? fd.grossMargins * 100 : null,
-      operatingMargin: num(fd.operatingMargins) != null ? fd.operatingMargins * 100 : null,
-      profitMargin: num(fd.profitMargins) != null ? fd.profitMargins * 100 : null,
-      revenueGrowth: num(fd.revenueGrowth) != null ? fd.revenueGrowth * 100 : null,
-      currentRatio: num(fd.currentRatio),
-      quickRatio: num(fd.quickRatio),
+      ...metrics,
       targetMean: num(fd.targetMeanPrice),
       recommendation: fd.recommendationKey,
       analysts: num(fd.numberOfAnalystOpinions),
-      financialCurrency: fd.financialCurrency || quote.financialCurrency || quote.currency,
+      financialCurrency: snap.financialCurrency,
     },
     balance: {
       latest: latestQuarter ? balance(latestQuarter) : annualBalances.at(-1) ?? null,

@@ -137,7 +137,7 @@ async function askClaude(system, prompt) {
   return textOf(response);
 }
 
-function ask(system, prompt) {
+export function askAI(system, prompt) {
   if (Date.now() < aiPausedUntil) return Promise.resolve(null);
   return aiProvider === "groq" ? askGroq(system, prompt) : askClaude(system, prompt);
 }
@@ -166,7 +166,7 @@ export function articleSummary(url, title) {
     const body = article.paragraphs.join("\n").slice(0, aiProvider === "groq" ? 5_000 : 12_000);
     if (aiEnabled && body.length > 200) {
       try {
-        const summary = await ask(
+        const summary = await askAI(
           "Eres un analista financiero. Resumes noticias para un inversor en español, de forma clara y neutral.",
           `Resume esta noticia en 2-3 oraciones en español. Después agrega una línea que empiece con "Impacto:" indicando qué empresas o activos podrían verse afectados y en qué sentido. No inventes datos que no estén en el texto. Responde solo con el resumen.\n\nTítulo: ${title}\n\n${body}`,
         );
@@ -192,7 +192,7 @@ export function dailyDigest(news) {
     .join("\n");
   const key = `digest:${news.slice(0, 30).map((n) => n.id).join(",")}`;
   return cached(key, 30 * MIN, () =>
-    ask(
+    askAI(
       "Eres un analista financiero que escribe un briefing de mercado breve en español.",
       `Con estos titulares, escribe un resumen del día en 3 a 5 viñetas cortas de una o dos oraciones (empezando con "- "): qué está moviendo al mercado y qué eventos próximos conviene seguir. Básate sólo en lo que dicen los titulares, sin interpretar más allá de ellos, y no des recomendaciones de compra, venta ni de cómo posicionarse.\n\n${headlines}`,
     ),

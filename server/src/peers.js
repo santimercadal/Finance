@@ -1,13 +1,12 @@
-import { yf, cached, quotes, MIN, HOUR } from "./yahoo.js";
-
-const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
-const pct = (v) => (num(v) != null ? v * 100 : null);
+import { yf, cached, quotes, crumbBlocked, blockCrumb, MIN, HOUR } from "./yahoo.js";
+import { companySnapshot } from "./company.js";
+import { askAI, aiEnabled } from "./news.js";
+import { getJSON, setJSON, storageKind } from "./storage.js";
 
 // Metrics used to compare a company against its competitors.
 // better: "high" = more is better, "low" = less is better.
 export const PEER_METRICS = [
   { key: "pe", category: "Valuación", better: "low", positiveOnly: true },
-  { key: "forwardPe", category: "Valuación", better: "low", positiveOnly: true },
   { key: "pb", category: "Valuación", better: "low", positiveOnly: true },
   { key: "evToEbitda", category: "Valuación", better: "low", positiveOnly: true },
   { key: "evToRevenue", category: "Valuación", better: "low", positiveOnly: true },
@@ -25,78 +24,78 @@ export const PEER_METRICS = [
   { key: "beta", category: "Riesgo", better: "low", noScore: true },
 ];
 
-// Industry page lists the largest companies of the industry (real competitors).
-function industryCompanies(industryKey) {
-  return cached(`industry:${industryKey}`, 12 * HOUR, async () => {
-    const res = await yf._fetch(
-      `https://query1.finance.yahoo.com/v1/finance/industries/${encodeURIComponent(industryKey)}`,
-      { formatted: "false", lang: "en-US", region: "US" },
-      { validateResult: false },
-      "json",
-      true,
-    );
-    const data = res?.data ?? res;
-    return (data?.topCompanies ?? []).map((c) => c.symbol).filter(Boolean);
-  });
+// Yahoo's industry page lists the largest companies of an industry, but it
+// needs the crumb, so it only works where Yahoo grants one (not on Render).
+async function industryCompanies(industry) {
+  if (!industry || crumbBlocked()) return [];
+  const key = industry.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  try {
+    return await cached(`industry:${key}`, 12 * HOUR, async () => {
+      const res = await yf._fetch(
+        `https://query1.finance.yahoo.com/v1/finance/industries/${encodeURIComponent(key)}`,
+        { formatted: "false", lang: "en-US", region: "US" },
+        { validateResult: false },
+        "json",
+        true,
+      );
+      const data = res?.data ?? res;
+      return (data?.topCompanies ?? []).map((c) => c.symbol).filter(Boolean);
+    });
+  } catch {
+    blockCrumb();
+    return [];
+  }
 }
 
-function summary(symbol) {
-  return cached(`peerqs:${symbol}`, 2 * HOUR, () =>
-    yf.quoteSummary(
-      symbol,
-      { modules: ["assetProfile", "financialData", "defaultKeyStatistics", "summaryDetail"] },
-      { validateResult: false },
-    ),
-  );
+// Ask the AI for the main listed competitors (stored for a week to save quota).
+async function aiCompetitors(snap) {
+  if (!aiEnabled) return [];
+  const storeKey = `peers:ai:${snap.symbol}`;
+  const persist = storageKind === "upstash";
+  if (persist) {
+    const saved = await getJSON(storeKey).catch(() => null);
+    if (saved) return saved;
+  }
+  const answer = await askAI(
+    "Eres un analista bursátil. Respondes solo con JSON válido, sin texto adicional.",
+    `Lista los 6 principales competidores directos que cotizan en bolsa de ${snap.profile.name} (ticker ${snap.symbol}, industria: ${snap.profile.industry ?? "desconocida"}, sector: ${snap.profile.sector ?? "desconocido"}). Prioriza empresas del mismo negocio y tamaño comparable. Usa los tickers tal como aparecen en Yahoo Finance (por ejemplo PEP, KDP, NSRGY, 7203.T). Formato: {"tickers": ["AAA", "BBB"]}`,
+  ).catch(() => null);
+  const json = answer?.match(/\{[\s\S]*\}/)?.[0];
+  let tickers = [];
+  try {
+    tickers = (JSON.parse(json ?? "{}").tickers ?? []).map((t) => String(t).trim().toUpperCase()).filter((t) => /^[A-Z0-9.^=-]{1,12}$/.test(t));
+  } catch {
+    return [];
+  }
+  // Keep only tickers Yahoo actually knows.
+  const valid = (await quotes(tickers)).map((q) => q.symbol.toUpperCase());
+  if (persist && valid.length) await setJSON(storeKey, valid, 7 * 24 * 3600).catch(() => {});
+  return valid;
 }
 
-async function companyMetrics(symbol) {
-  const [s, [q]] = await Promise.all([summary(symbol), quotes([symbol])]);
-  const fd = s.financialData ?? {};
-  const ks = s.defaultKeyStatistics ?? {};
-  const sd = s.summaryDetail ?? {};
-  const ap = s.assetProfile ?? {};
-  return {
-    symbol,
-    name: q?.shortName || q?.longName || symbol,
-    industry: ap.industry,
-    industryKey: ap.industryKey,
-    sector: ap.sector,
-    marketCap: num(q?.marketCap),
-    price: num(q?.regularMarketPrice),
-    currency: q?.currency,
-    changePct: num(q?.regularMarketChangePercent),
-    metrics: {
-      pe: num(sd.trailingPE) ?? num(q?.trailingPE),
-      forwardPe: num(sd.forwardPE) ?? num(q?.forwardPE),
-      pb: num(ks.priceToBook),
-      evToEbitda: num(ks.enterpriseToEbitda),
-      evToRevenue: num(ks.enterpriseToRevenue),
-      roe: pct(fd.returnOnEquity),
-      roa: pct(fd.returnOnAssets),
-      grossMargin: pct(fd.grossMargins),
-      operatingMargin: pct(fd.operatingMargins),
-      profitMargin: pct(fd.profitMargins),
-      revenueGrowth: pct(fd.revenueGrowth),
-      earningsGrowth: pct(fd.earningsGrowth),
-      // Yahoo reports debt/equity as a percentage (78.4 = 0.784x).
-      debtToEquity: num(fd.debtToEquity) != null ? fd.debtToEquity / 100 : null,
-      currentRatio: num(fd.currentRatio),
-      quickRatio: num(fd.quickRatio),
-      dividendYield: pct(sd.dividendYield) ?? 0,
-      beta: num(sd.beta) ?? num(ks.beta),
-    },
-  };
-}
-
-async function findPeers(symbol, profile) {
-  let candidates = [];
-  if (profile.industryKey) candidates = await industryCompanies(profile.industryKey).catch(() => []);
+async function findPeers(snap) {
+  const symbol = snap.symbol;
+  let candidates = (await industryCompanies(snap.profile.industry)).filter((s) => s !== symbol);
+  if (candidates.length < 3) candidates.push(...(await aiCompetitors(snap)));
   if (candidates.filter((s) => s !== symbol).length < 3) {
     const rec = await yf.recommendationsBySymbol(symbol, {}, { validateResult: false }).catch(() => null);
     candidates.push(...(rec?.recommendedSymbols ?? []).map((r) => r.symbol));
   }
   return [...new Set(candidates)].filter((s) => s !== symbol);
+}
+
+function companyMetrics(symbol) {
+  return companySnapshot(symbol).then((s) => ({
+    symbol: s.symbol,
+    name: s.quote.shortName || s.profile.name,
+    industry: s.profile.industry,
+    sector: s.profile.sector,
+    marketCap: s.quote.marketCap,
+    price: s.quote.regularMarketPrice,
+    currency: s.quote.currency,
+    changePct: s.quote.regularMarketChangePercent,
+    metrics: s.metrics,
+  }));
 }
 
 const median = (arr) => {
@@ -125,7 +124,7 @@ export async function peerComparison(symbol, extra = []) {
   symbol = symbol.toUpperCase();
   return cached(`peers:${symbol}:${extra.join(",")}`, 30 * MIN, async () => {
     const self = await companyMetrics(symbol);
-    const auto = await findPeers(symbol, self);
+    const auto = await findPeers(await companySnapshot(symbol));
     const peerSymbols = [...new Set([...extra.map((s) => s.toUpperCase()), ...auto])]
       .filter((s) => s !== symbol)
       .slice(0, 6 + extra.length);

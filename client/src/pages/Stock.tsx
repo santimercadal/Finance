@@ -82,7 +82,6 @@ function Overview({ d }: { d: StockDetail }) {
         <div className="stats">
           <MetricStat id="marketCap" value={compact(d.quote.marketCap, d.quote.currency)} />
           <MetricStat id="pe" value={num(n('pe'), 1)} raw={n('pe')} format={(v) => num(v, 1)} />
-          <MetricStat id="forwardPe" value={num(n('forwardPe'), 1)} raw={n('forwardPe')} format={(v) => num(v, 1)} />
           <MetricStat id="pb" value={num(n('pb'), 2)} raw={n('pb')} format={(v) => num(v, 2)} />
           <MetricStat id="evToEbitda" value={num(n('evToEbitda'), 1)} raw={n('evToEbitda')} format={(v) => num(v, 1)} />
           <MetricStat id="dividendYield" value={pct(n('dividendYield'), 2, false)} raw={n('dividendYield') ?? 0} format={(v) => pct(v, 2, false)} />

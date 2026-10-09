@@ -24,6 +24,22 @@ async function redis(command) {
   return body.result;
 }
 
+// Detects a read-only token (Upstash's "Readonly Token" rejects SET with NOPERM).
+// Cached for 10 minutes so frequent health checks don't spend the free command quota.
+let writableCheck = { at: 0, result: null };
+export async function storageWritable() {
+  if (Date.now() - writableCheck.at < 10 * 60_000) return writableCheck.result;
+  let result;
+  try {
+    await setJSON("health-check", { at: Date.now() }, 600);
+    result = true;
+  } catch (err) {
+    result = err.message.slice(0, 120);
+  }
+  writableCheck = { at: Date.now(), result };
+  return result;
+}
+
 export async function getJSON(key) {
   if (storageKind === "upstash") {
     const raw = await redis(["GET", key]);

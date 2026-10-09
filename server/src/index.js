@@ -8,8 +8,9 @@ import { yf, cached, quotes, MIN } from "./yahoo.js";
 import { portfolioSnapshot, portfolioHistory, loadHoldings, upsertHolding, removeHolding } from "./portfolio.js";
 import { stockDetail, stockReports } from "./stock.js";
 import { peerComparison } from "./peers.js";
+import { isSecDocument, SEC_HEADERS } from "./sec.js";
 import { newsFeed, articleSummary, dailyDigest, aiEnabled, aiProvider } from "./news.js";
-import { storageKind } from "./storage.js";
+import { storageKind, storageWritable } from "./storage.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -25,7 +26,7 @@ const sameSecret = (a, b) => {
   return crypto.timingSafeEqual(ha, hb);
 };
 app.use("/api", (req, res, next) => {
-  if (!PASSWORD || req.path === "/health" || req.path === "/health/yahoo") return next();
+  if (!PASSWORD || req.path === "/health") return next();
   if (sameSecret(String(req.get("x-app-key") ?? ""), PASSWORD)) return next();
   res.status(401).json({ error: "Contraseña requerida", auth: true });
 });
@@ -51,44 +52,11 @@ const wrap = (fn) => async (req, res) => {
   }
 };
 
-app.get("/api/health", (_req, res) => res.json({ ok: true, ai: aiProvider, auth: Boolean(PASSWORD), storage: storageKind }));
+app.get("/api/health", async (_req, res) => {
+  res.json({ ok: true, ai: aiProvider, auth: Boolean(PASSWORD), storage: storageKind, storageWritable: await storageWritable() });
+});
 app.get("/api/auth/check", (_req, res) => res.json({ ok: true }));
 
-// Temporary diagnostic: which Yahoo endpoints answer from this host (no data returned).
-app.get("/api/health/yahoo", async (_req, res) => {
-  const probe = async (name, fn) => {
-    const t = Date.now();
-    try {
-      const r = await fn();
-      return [name, `ok ${Date.now() - t}ms ${JSON.stringify(r).length}b`];
-    } catch (err) {
-      return [name, `fail: ${err.message.slice(0, 120)}`];
-    }
-  };
-  const ua = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130 Safari/537.36" };
-  const raw = (url) => async () => {
-    const r = await fetch(url, { headers: ua, signal: AbortSignal.timeout(15_000) });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return (await r.text()).slice(0, 50);
-  };
-  const results = await Promise.all([
-    probe("chart", () => yf.chart("KO", { period1: "2026-09-01" }, { validateResult: false })),
-    probe("search", () => yf.search("KO", { newsCount: 2 }, { validateResult: false })),
-    probe("fts", () => yf.fundamentalsTimeSeries("KO", { period1: "2025-01-01", type: "quarterly", module: "all" }, { validateResult: false })),
-    probe("recs", () => yf.recommendationsBySymbol("KO", {}, { validateResult: false })),
-    probe("quote", () => yf.quote("KO", {}, { validateResult: false })),
-    probe("raw-chart-q1", raw("https://query1.finance.yahoo.com/v8/finance/chart/KO")),
-    probe("raw-chart-q2", raw("https://query2.finance.yahoo.com/v8/finance/chart/KO")),
-    probe("raw-industry", raw("https://query1.finance.yahoo.com/v1/finance/industries/beverages-non-alcoholic")),
-    probe("raw-crumb", raw("https://query1.finance.yahoo.com/v1/test/getcrumb")),
-    probe("sec-tickers", async () => {
-      const r = await fetch("https://www.sec.gov/files/company_tickers.json", { headers: { "User-Agent": "mi-portafolio admin@example.com" }, signal: AbortSignal.timeout(15_000) });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return "ok";
-    }),
-  ]);
-  res.json(Object.fromEntries(results));
-});
 
 app.get("/api/market", wrap(async () => {
   const qs = await quotes(INDICATORS.map((i) => i.symbol));
@@ -124,15 +92,15 @@ app.get("/api/stock/:symbol/peers", wrap((req) => {
 }));
 app.get("/api/stock/:symbol/reports", wrap((req) => stockReports(req.params.symbol)));
 
-// Downloads an SEC filing document. Only Yahoo's filings CDN is allowed, so this
+// Downloads an SEC filing document. Only the SEC archive is allowed, so this
 // can't be used to fetch arbitrary URLs through the server.
 app.get("/api/filing", async (req, res) => {
   const url = String(req.query.url ?? "");
-  if (!/^https:\/\/cdn\.yahoofinance\.com\/prod\/sec-filings\/[\w/.-]+$/.test(url)) {
+  if (!isSecDocument(url)) {
     return res.status(400).json({ error: "URL de informe no válida" });
   }
   try {
-    const upstream = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    const upstream = await fetch(url, { headers: SEC_HEADERS, signal: AbortSignal.timeout(30_000) });
     if (!upstream.ok) return res.status(502).json({ error: `No se pudo descargar el informe (${upstream.status})` });
     const name = String(req.query.name ?? url.split("/").pop()).replace(/[^\w.-]/g, "_");
     res.set("Content-Type", upstream.headers.get("content-type") ?? "text/html");
