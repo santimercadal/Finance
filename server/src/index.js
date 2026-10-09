@@ -25,7 +25,7 @@ const sameSecret = (a, b) => {
   return crypto.timingSafeEqual(ha, hb);
 };
 app.use("/api", (req, res, next) => {
-  if (!PASSWORD || req.path === "/health") return next();
+  if (!PASSWORD || req.path === "/health" || req.path === "/health/yahoo") return next();
   if (sameSecret(String(req.get("x-app-key") ?? ""), PASSWORD)) return next();
   res.status(401).json({ error: "Contraseña requerida", auth: true });
 });
@@ -53,6 +53,42 @@ const wrap = (fn) => async (req, res) => {
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, ai: aiProvider, auth: Boolean(PASSWORD), storage: storageKind }));
 app.get("/api/auth/check", (_req, res) => res.json({ ok: true }));
+
+// Temporary diagnostic: which Yahoo endpoints answer from this host (no data returned).
+app.get("/api/health/yahoo", async (_req, res) => {
+  const probe = async (name, fn) => {
+    const t = Date.now();
+    try {
+      const r = await fn();
+      return [name, `ok ${Date.now() - t}ms ${JSON.stringify(r).length}b`];
+    } catch (err) {
+      return [name, `fail: ${err.message.slice(0, 120)}`];
+    }
+  };
+  const ua = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130 Safari/537.36" };
+  const raw = (url) => async () => {
+    const r = await fetch(url, { headers: ua, signal: AbortSignal.timeout(15_000) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return (await r.text()).slice(0, 50);
+  };
+  const results = await Promise.all([
+    probe("chart", () => yf.chart("KO", { period1: "2026-09-01" }, { validateResult: false })),
+    probe("search", () => yf.search("KO", { newsCount: 2 }, { validateResult: false })),
+    probe("fts", () => yf.fundamentalsTimeSeries("KO", { period1: "2025-01-01", type: "quarterly", module: "all" }, { validateResult: false })),
+    probe("recs", () => yf.recommendationsBySymbol("KO", {}, { validateResult: false })),
+    probe("quote", () => yf.quote("KO", {}, { validateResult: false })),
+    probe("raw-chart-q1", raw("https://query1.finance.yahoo.com/v8/finance/chart/KO")),
+    probe("raw-chart-q2", raw("https://query2.finance.yahoo.com/v8/finance/chart/KO")),
+    probe("raw-industry", raw("https://query1.finance.yahoo.com/v1/finance/industries/beverages-non-alcoholic")),
+    probe("raw-crumb", raw("https://query1.finance.yahoo.com/v1/test/getcrumb")),
+    probe("sec-tickers", async () => {
+      const r = await fetch("https://www.sec.gov/files/company_tickers.json", { headers: { "User-Agent": "mi-portafolio admin@example.com" }, signal: AbortSignal.timeout(15_000) });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return "ok";
+    }),
+  ]);
+  res.json(Object.fromEntries(results));
+});
 
 app.get("/api/market", wrap(async () => {
   const qs = await quotes(INDICATORS.map((i) => i.symbol));
