@@ -19,7 +19,7 @@ function Gauge({ score, verdict }: { score: number; verdict: string | null }) {
           strokeDasharray={`${(score / 100) * c} ${c}`} />
       </svg>
       <div className="gauge-value"><b>{score}</b><span>/100</span></div>
-      <div className={`gauge-verdict ${scoreClass(score)}`}>{verdict}</div>
+      <span className={`badge gauge-verdict ${scoreClass(score)}`}>{verdict}</span>
     </div>
   )
 }
@@ -62,7 +62,7 @@ export default function Competition({ data, loading, error, onAdd }: Props) {
               <div key={c.name} className="cat-bar">
                 <div className="cat-bar-head">
                   <span>{c.name}</span>
-                  <span className="num"><b>{c.score}</b> · <span className={`verdict ${scoreClass(c.score)}`}>{c.verdict}</span></span>
+                  <span className="num"><b>{c.score}</b> · <span className={`badge ${scoreClass(c.score)}`}>{c.verdict}</span></span>
                 </div>
                 <div className="bar-track"><div className={`bar-fill ${scoreClass(c.score)}`} style={{ width: `${Math.max(c.score, 2)}%` }} /></div>
               </div>

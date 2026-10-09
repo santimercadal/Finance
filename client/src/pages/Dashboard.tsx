@@ -15,7 +15,7 @@ function Kpis({ p }: { p: Portfolio }) {
   const t = p.totals
   return (
     <div className="kpis">
-      <div className="kpi">
+      <div className="kpi hero">
         <div className="label">Valor del portafolio</div>
         <div className="value num">{money(t.value)}</div>
         <div className="sub muted">{p.holdings.length} posiciones</div>
@@ -23,16 +23,16 @@ function Kpis({ p }: { p: Portfolio }) {
       <div className="kpi">
         <div className="label">Variación del día</div>
         <div className={`value num ${tone(t.dayChange)}`}>{signedMoney(t.dayChange)}</div>
-        <div className={`sub num ${tone(t.dayChangePct)}`}>{pct(t.dayChangePct)}</div>
+        <div className="sub"><span className={`badge ${tone(t.dayChangePct)}`}>{pct(t.dayChangePct)}</span></div>
       </div>
       <div className="kpi">
-        <div className="label">Ganancia / pérdida total</div>
+        <div className="label">Ganancia total</div>
         <div className={`value num ${tone(t.pnl)}`}>{signedMoney(t.pnl)}</div>
-        <div className={`sub num ${tone(t.pnlPct)}`}>{pct(t.pnlPct)} sobre {compact(t.cost)} invertidos</div>
+        <div className="sub"><span className={`badge ${tone(t.pnlPct)}`}>{pct(t.pnlPct)}</span> <span className="muted num">s/ {compact(t.cost)}</span></div>
       </div>
       <div className="kpi">
         <div className="label">Mejor / peor del día</div>
-        <div className="value" style={{ fontSize: 18 }}>
+        <div className="value" style={{ fontSize: 16 }}>
           {t.best ? <Link to={`/accion/${t.best.symbol}`}>{t.best.symbol}</Link> : '—'}{' '}
           <span className={`num ${tone(t.best?.pct)}`}>{pct(t.best?.pct)}</span>
         </div>
@@ -149,8 +149,8 @@ function Holdings({ p, reload }: { p: Portfolio; reload: () => void }) {
 
   return (
     <section className="card">
-      <div className="card-head"><h2>Mis posiciones</h2><span className="small muted">Click en una fila para ver el análisis</span></div>
-      <div className="table-wrap">
+      <div className="card-head"><h2>Mis posiciones</h2><span className="small muted">Toca una posición para ver el análisis</span></div>
+      <div className="table-wrap holdings-table">
         <table>
           <thead>
             <tr>
@@ -175,6 +175,28 @@ function Holdings({ p, reload }: { p: Portfolio; reload: () => void }) {
           </tbody>
         </table>
       </div>
+      <div className="positions">
+        {p.holdings.map((h) => (
+          <div key={h.symbol} className="position" role="link" tabIndex={0}
+            onClick={() => navigate(`/accion/${encodeURIComponent(h.symbol)}`)}
+            onKeyDown={(e) => e.key === 'Enter' && navigate(`/accion/${encodeURIComponent(h.symbol)}`)}>
+            <div style={{ minWidth: 0 }}>
+              <div className="sym">
+                {h.symbol}
+                <button className="icon-btn" aria-label={`Quitar ${h.symbol}`} onClick={(e) => { e.stopPropagation(); remove(h.symbol) }}>✕</button>
+              </div>
+              <div className="name">{h.name}</div>
+              <div className="meta">{num(h.shares, h.shares % 1 ? 2 : 0)} × {money(h.avgCost, h.currency)}</div>
+            </div>
+            <Sparkline values={h.spark} />
+            <div className="right">
+              <div className="price">{money(h.valueUsd)}</div>
+              <span className={`badge ${tone(h.dayChangePct)}`}>{pct(h.dayChangePct)}</span>
+              <div className={`meta ${tone(h.pnlUsd)}`}>{signedMoney(h.pnlUsd)}</div>
+            </div>
+          </div>
+        ))}
+      </div>
       <form className="add-form" onSubmit={add}>
         <SymbolSearch className="search" placeholder="Símbolo" onSelect={(r) => setSymbol(r.symbol)} />
         {symbol && <span className="chip" style={{ alignSelf: 'center' }}>{symbol}</span>}
@@ -185,6 +207,21 @@ function Holdings({ p, reload }: { p: Portfolio; reload: () => void }) {
       {err && <div className="error" style={{ marginTop: 6 }}>{err}</div>}
       <div className="note">Los valores en otras monedas se convierten a USD al tipo de cambio actual. El costo promedio se ingresa en la moneda del activo.</div>
     </section>
+  )
+}
+
+// 48×24 trend line of the last month; color encodes direction (also shown by the % badge).
+function Sparkline({ values }: { values?: number[] }) {
+  if (!values || values.length < 2) return <span />
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = max - min || 1
+  const points = values.map((v, i) => `${(i / (values.length - 1)) * 48},${22 - ((v - min) / range) * 20}`).join(' ')
+  const up = values.at(-1)! >= values[0]
+  return (
+    <svg className="spark" width="48" height="24" viewBox="0 0 48 24" aria-label={`Tendencia 1 mes: ${up ? 'alcista' : 'bajista'}`}>
+      <polyline points={points} fill="none" stroke={up ? 'var(--gain)' : 'var(--loss)'} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
   )
 }
 

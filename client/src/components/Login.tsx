@@ -22,7 +22,7 @@ export default function Login() {
   return (
     <div className="login">
       <form className="card login-card" onSubmit={submit}>
-        <div className="brand-mark">◆</div>
+        <div className="brand-mark"><img src="/icon-192.png" alt="" /></div>
         <h1>Mi Portafolio</h1>
         <p className="muted small">Ingresa la contraseña de acceso que configuraste en el servidor.</p>
         <input

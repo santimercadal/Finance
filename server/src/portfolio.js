@@ -44,11 +44,15 @@ export async function portfolioSnapshot() {
   const holdings = await loadHoldings();
   const qs = await quotes(holdings.map((h) => h.symbol));
   const bySym = Object.fromEntries(qs.map((q) => [q.symbol, q]));
+  const sparkStart = new Date(Date.now() - 31 * 864e5).toISOString().slice(0, 10);
 
   const rows = await Promise.all(
     holdings.map(async (h) => {
       const q = bySym[h.symbol] ?? {};
-      const fx = await fxPerUsd(q.currency);
+      const [fx, closes] = await Promise.all([
+        fxPerUsd(q.currency),
+        dailyCloses(h.symbol, sparkStart).catch(() => []),
+      ]);
       const price = q.regularMarketPrice ?? null;
       const prev = q.regularMarketPreviousClose ?? price;
       const value = price != null ? (price * h.shares) / fx : null;
@@ -65,6 +69,7 @@ export async function portfolioSnapshot() {
         pnlUsd: value != null ? value - cost : null,
         pnlPct: value != null ? pct(value, cost) : null,
         marketState: q.marketState,
+        spark: closes.map((c) => c.close),
       };
     }),
   );

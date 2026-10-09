@@ -23,7 +23,25 @@ function SeriesLegend({ items }: { items: [string, string][] }) {
   )
 }
 
-const axis = { tick: { fill: 'var(--muted)', fontSize: 11 }, tickLine: false }
+// Thin segmented bar comparing two balance-sheet amounts, labelled with their share.
+function RatioBar({ label, parts }: { label: string; parts: [string, number | null, string][] }) {
+  const valid = parts.filter(([, v]) => v != null && v > 0) as [string, number, string][]
+  const total = valid.reduce((s, [, v]) => s + v, 0)
+  if (valid.length < 2 || !total) return null
+  return (
+    <div>
+      <div className="ratio-bar-head">
+        <span>{label}</span>
+        <span>{valid.map(([name, v]) => <span key={name} style={{ marginLeft: 10 }}>{name} <b>{pct((v / total) * 100, 0, false)}</b></span>)}</span>
+      </div>
+      <div className="ratio-bar" role="img" aria-label={valid.map(([n, v]) => `${n} ${pct((v / total) * 100, 0, false)}`).join(', ')}>
+        {valid.map(([name, v, color]) => <div key={name} style={{ width: `${(v / total) * 100}%`, background: `var(${color})` }} />)}
+      </div>
+    </div>
+  )
+}
+
+const axis ={ tick: { fill: 'var(--muted)', fontSize: 11 }, tickLine: false }
 
 
 function Overview({ d }: { d: StockDetail }) {
@@ -171,6 +189,14 @@ function Structure({ d }: { d: StockDetail }) {
             <MetricStat id="currentRatio" value={num(b.currentRatio, 2)} raw={b.currentRatio} format={(v) => num(v, 2)} />
             <MetricStat id="liabilitiesToEquity" value={num(b.totalLiabilities != null && b.equity ? b.totalLiabilities / b.equity : null, 2)} />
             <MetricStat id="workingCapital" value={compact(b.workingCapital, cur)} cls={tone(b.workingCapital)} />
+          </div>
+          <div className="ratio-bars" style={{ marginTop: 16 }}>
+            <RatioBar label="Activo corriente vs. pasivo corriente"
+              parts={[['Activo cte.', b.currentAssets, '--s1'], ['Pasivo cte.', b.currentLiabilities, '--s2']]} />
+            <RatioBar label="Financiamiento del activo"
+              parts={[['Pasivo', b.totalLiabilities, '--s2'], ['Patrimonio', b.equity, '--s3']]} />
+            <RatioBar label="Deuda corto vs. largo plazo"
+              parts={[['Corto plazo', b.currentDebt, '--s4'], ['Largo plazo', b.longTermDebt, '--s1']]} />
           </div>
         </section>
       </div>
@@ -410,7 +436,7 @@ function StockView({ symbol }: { symbol: string }) {
           <>
             <div className="stock-head">
               <div>
-                <h1 style={{ fontSize: 22 }}>{d.quote.name} <span className="muted" style={{ fontWeight: 400 }}>{d.symbol}</span></h1>
+                <h1>{d.quote.name} <span className="ticker-sym">{d.symbol}</span></h1>
                 <div className="small muted">{d.quote.exchange} · {d.quote.currency}{d.quote.marketState !== 'REGULAR' && ' · Mercado cerrado'}</div>
               </div>
               <div style={{ textAlign: 'right' }}>

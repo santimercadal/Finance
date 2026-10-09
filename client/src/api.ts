@@ -23,6 +23,7 @@ export interface Holding {
   pnlUsd: number | null
   pnlPct: number | null
   weight: number
+  spark?: number[]
 }
 
 export interface Portfolio {
