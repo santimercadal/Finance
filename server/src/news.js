@@ -5,7 +5,7 @@ import { getJSON, setJSON, storageKind } from "./storage.js";
 // AI provider for summaries. Groq has a free tier (open models, no card);
 // Claude is the paid option. Groq wins when both keys are configured.
 const GROQ_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
 const CLAUDE_MODEL = "claude-opus-5-5";
 const hasClaude = Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
 export const aiProvider = GROQ_KEY ? "groq" : hasClaude ? "claude" : null;
@@ -102,7 +102,9 @@ async function askGroq(system, prompt) {
     headers: { Authorization: `Bearer ${GROQ_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: GROQ_MODEL,
-      max_tokens: 600,
+      // gpt-oss models reason before answering; keep it short to save the free quota.
+      ...(GROQ_MODEL.includes("gpt-oss") ? { reasoning_effort: "low" } : {}),
+      max_completion_tokens: 2000,
       temperature: 0.2,
       messages: [
         { role: "system", content: system },
@@ -192,7 +194,7 @@ export function dailyDigest(news) {
   return cached(key, 30 * MIN, () =>
     ask(
       "Eres un analista financiero que escribe un briefing de mercado breve en español.",
-      `Con estos titulares, escribe un resumen del día en 3 a 5 viñetas cortas (empezando con "- "): qué está moviendo al mercado y qué conviene seguir. Básate sólo en los titulares.\n\n${headlines}`,
+      `Con estos titulares, escribe un resumen del día en 3 a 5 viñetas cortas de una o dos oraciones (empezando con "- "): qué está moviendo al mercado y qué eventos próximos conviene seguir. Básate sólo en lo que dicen los titulares, sin interpretar más allá de ellos, y no des recomendaciones de compra, venta ni de cómo posicionarse.\n\n${headlines}`,
     ),
   ).catch((err) => {
     console.error("AI digest failed:", err.message);
