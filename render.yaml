@@ -1,0 +1,25 @@
+# Render Blueprint: crea el servicio web desde este repo (New > Blueprint en render.com).
+services:
+  - type: web
+    name: mi-portafolio
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      # Contraseña para entrar a la app (obligatoria si es pública).
+      - key: APP_PASSWORD
+        sync: false
+      # Base de datos gratuita de Upstash (Redis) para guardar el portafolio.
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      # Opcional: resúmenes de noticias con IA.
+      - key: ANTHROPIC_API_KEY
+        sync: false
