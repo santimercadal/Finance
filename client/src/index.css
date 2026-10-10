@@ -439,12 +439,6 @@ table.compare .group-row td {
 .type-chip { margin-left: 6px; font-size: 10px; vertical-align: middle; font-weight: 500; }
 .stock-head h1 .type-chip { font-size: 12px; vertical-align: 4px; }
 
-/* ---------- News below positions ---------- */
-@media (min-width: 900px) {
-  .news-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 20px; align-items: start; }
-  .news-layout > :only-child { grid-column: 1 / -1; }
-}
-
 /* ---------- Analysts' pros and cons ---------- */
 .analyst + .analyst { border-top: 1px solid var(--border-1); padding-top: 16px; margin-top: 16px; }
 .analyst-tags { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -575,3 +569,13 @@ table.compare .group-row td {
 .tip-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-sm); background: rgba(255, 182, 137, 0.1); color: var(--warn); flex: none; }
 .tip-title { color: var(--warn); margin-bottom: 2px; }
 .tip-card .small { color: var(--text-2); }
+
+/* ---------- Projections (analyst estimates) ---------- */
+.target-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.target-track { position: relative; height: 6px; border-radius: 3px; background: var(--layer-4); margin: 8px 0; }
+.target-band { position: absolute; top: 0; bottom: 0; background: rgba(94, 107, 255, 0.35); border-radius: 3px; }
+.target-mark { position: absolute; top: -5px; width: 3px; height: 16px; border-radius: 2px; transform: translateX(-50%); }
+.target-mark.mean { background: var(--primary); }
+.target-mark.price { background: var(--text); }
+.target-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+.rating-bar { height: 10px; border-radius: var(--radius-sm); }

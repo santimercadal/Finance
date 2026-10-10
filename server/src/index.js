@@ -13,6 +13,7 @@ import { aiEnabled, aiProvider } from "./ai.js";
 import { storageKind, storageWritable, getJSON, setJSON } from "./storage.js";
 import { etoroEnabled, etoroHoldings } from "./etoro.js";
 import { analystView } from "./analysts.js";
+import { stockEstimates } from "./estimates.js";
 import { httpError } from "./util.js";
 
 const app = express();
@@ -150,6 +151,7 @@ app.get("/api/stock/:symbol/peers", wrap((req) => {
 }));
 app.get("/api/stock/:symbol/reports", wrap((req) => stockReports(req.params.symbol)));
 app.get("/api/stock/:symbol/analysts", wrap((req) => analystView(req.params.symbol)));
+app.get("/api/stock/:symbol/estimates", wrap((req) => stockEstimates(req.params.symbol)));
 
 // Analysts' pros and cons for every holding that has coverage.
 app.get("/api/analysts", wrap(async () => {

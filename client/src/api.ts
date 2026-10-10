@@ -232,6 +232,41 @@ export interface PeerComparison {
   companies: PeerCompany[]
 }
 
+interface EstimateRange {
+  avg: number
+  low: number | null
+  high: number | null
+  analysts: number | null
+  growth: number | null
+}
+
+export interface EstimatePeriod {
+  kind: 'quarter' | 'year'
+  end: string | null
+  label: string
+  eps: EstimateRange
+  epsYearAgo: number | null
+  revenue: EstimateRange | null
+  revisions: { up: number; down: number } | null
+  impliedPrice: number | null
+  impliedUpside: number | null
+}
+
+export interface Estimates {
+  symbol: string
+  currency: string
+  epsCurrency: string
+  price: number
+  pe: number | null
+  source: string | null
+  target: { low: number | null; mean: number; high: number | null; analysts: number | null; upside: number | null; source: string | null } | null
+  argus: { target: number; rating: string | null } | null
+  ratings: { strongBuy: number; buy: number; hold: number; sell: number; strongSell: number } | null
+  periods: EstimatePeriod[]
+  surprises: { quarter: string; actual: number; estimate: number; surprisePct: number | null }[]
+  history: { end: string; eps: number }[]
+}
+
 export interface Reports {
   symbol: string
   name: string

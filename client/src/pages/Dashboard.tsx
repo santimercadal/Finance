@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Area, AreaChart, Line, ResponsiveContainer, Tooltip, YAxis } from 'recharts'
-import { api, useApi, type Holding, type NewsItem, type Portfolio, type PortfolioHistory } from '../api'
+import { api, useApi, type Holding, type Portfolio, type PortfolioHistory } from '../api'
 import { compact, formatDate, money, num, pct, signedMoney, tone } from '../format'
 import MarketStrip from '../components/MarketStrip'
-import NewsList from '../components/NewsList'
 import ChartTip from '../components/ChartTip'
 import SymbolSearch from '../components/SymbolSearch'
 import ImportHoldings from '../components/ImportHoldings'
-import DailyDigest from '../components/DailyDigest'
 import MetricStat from '../components/MetricStat'
 
 const RANGES = { '1M': 30, '3M': 91, '6M': 182, '1A': 365 } as const
@@ -413,12 +411,12 @@ function Sparkline({ values }: { values?: number[] }) {
 
 export default function Dashboard() {
   const portfolio = useApi<Portfolio>('/portfolio', 60_000)
-  const news = useApi<NewsItem[]>('/news?limit=8', 10 * 60_000)
   const [privacy, togglePrivacy] = usePrivacy()
   const [panel, setPanel] = useState<Panel>(null)
 
   return (
     <main className="dashboard">
+      <MarketStrip />
       <StatusBar updated={portfolio.updatedAt} privacy={privacy} togglePrivacy={togglePrivacy} onRefresh={portfolio.reload} />
       {portfolio.error && <div className="error">No se pudo cargar el portafolio: {portfolio.error}</div>}
       <div className="dash-grid">
@@ -439,14 +437,6 @@ export default function Dashboard() {
           {portfolio.data && <ConcentrationTip p={portfolio.data} />}
         </div>
       </div>
-      <MarketStrip />
-      <section className="card">
-        <div className="card-head"><h2>Noticias de tu portafolio</h2><Link to="/noticias" className="small">Ver todas →</Link></div>
-        <div className="news-layout">
-          <DailyDigest />
-          {news.data ? <NewsList items={news.data} /> : <div className="skeleton" style={{ height: 200 }} />}
-        </div>
-      </section>
     </main>
   )
 }

@@ -14,8 +14,9 @@ import Competition from '../components/Competition'
 import ReportsPanel from '../components/ReportsPanel'
 import FundOverview from '../components/FundOverview'
 import AnalystCard from '../components/AnalystCard'
+import Projections from '../components/Projections'
 
-const TABS = ['Resumen', 'Competencia', 'Estructura patrimonial', 'Flujo de fondos', 'Deuda', 'Informes', 'Noticias'] as const
+const TABS = ['Resumen', 'Proyecciones', 'Competencia', 'Estructura patrimonial', 'Flujo de fondos', 'Deuda', 'Informes', 'Noticias'] as const
 type Tab = (typeof TABS)[number]
 // ETFs and crypto have no financial statements or industry peers.
 const FUND_TABS: readonly Tab[] = ['Resumen', 'Noticias']
@@ -482,6 +483,7 @@ function StockView({ symbol }: { symbol: string }) {
               ))}
             </div>
             {tab === 'Resumen' && <Overview d={d} />}
+            {tab === 'Proyecciones' && <Projections symbol={d.symbol} />}
             {tab === 'Competencia' && (
               <Competition
                 data={peers.data}
