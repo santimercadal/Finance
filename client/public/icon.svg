@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Mi Portafolio">
+  <rect width="1024" height="1024" fill="#FFFFFF" />
+  <defs>
+    <!-- Gap cut into the letters wherever the arrow crosses them -->
+    <mask id="mp-cut" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect width="1024" height="1024" fill="#fff" />
+      <polyline points="188,700 316,565 396,645 581,456 636,510 793,348" fill="none" stroke="#000" stroke-width="74" />
+      <polygon points="847,290 753,310 830,382" fill="#000" stroke="#000" stroke-width="36" stroke-linejoin="round" />
+    </mask>
+  </defs>
+  <g mask="url(#mp-cut)" fill="none" stroke="#10294A" stroke-width="38" stroke-linejoin="round">
+    <path d="M199 660V400C199 372 222 360 246 382L387 507L537 367V470" />
+    <path d="M538 540V688H625V577H720A100 105 0 0 0 720 367H625V470" />
+  </g>
+  <polyline points="188,700 316,565 396,645 581,456 636,510 793,348" fill="none" stroke="#0AA66A" stroke-width="37" />
+  <polygon points="847,290 753,310 830,382" fill="#0AA66A" />
+</svg>

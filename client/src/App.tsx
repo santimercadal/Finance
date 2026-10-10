@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Route, Routes, useNavigate } from 'react-router-dom'
+import { NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
 import StockPage from './pages/Stock'
 import NewsPage from './pages/News'
@@ -16,6 +16,8 @@ const icon = (d: string) => (
 
 export default function App() {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const section = pathname.startsWith('/noticias') ? 'Noticias' : pathname.startsWith('/accion') ? 'Acciones' : 'Portafolio'
   const [needLogin, setNeedLogin] = useState(false)
 
   useEffect(() => {
@@ -34,9 +36,12 @@ export default function App() {
   return (
     <>
       <header className="topbar">
-        <NavLink to="/" className="brand"><img className="brand-logo" src="/icon-192.png" alt="" />Mi Portafolio</NavLink>
+        <NavLink to="/" className="brand">
+          <img className="brand-logo" src="/logo.svg" alt="" />
+          <span className="brand-text"><span>Mi Portafolio</span><small>{section}</small></span>
+        </NavLink>
         <nav className="nav">
-          <NavLink to="/" end>Inicio</NavLink>
+          <NavLink to="/" end>Portafolio</NavLink>
           <NavLink to="/noticias">Noticias</NavLink>
         </nav>
         <SymbolSearch placeholder="Buscar ticker…" onSelect={(s) => navigate(`/accion/${encodeURIComponent(s.symbol)}`)} />
@@ -48,9 +53,9 @@ export default function App() {
         <Route path="/accion/:symbol/informe" element={<ReportPrint />} />
       </Routes>
       <nav className="bottom-nav" aria-label="Navegación principal">
-        <NavLink to="/" end>{icon('M3 12l9-8 9 8M5 10v10h5v-6h4v6h5V10')}Inicio</NavLink>
+        <NavLink to="/" end>{icon('M3 7a2 2 0 0 1 2-2h14v14H5a2 2 0 0 1-2-2V7zm0 0h18M15 12h2')}Portafolio</NavLink>
+        <button onClick={focusSearch} className={section === 'Acciones' ? 'active' : ''}>{icon('M3 3v18h18M7 15l4-4 3 3 5-6')}Acciones</button>
         <NavLink to="/noticias">{icon('M4 5h13v14H6a2 2 0 0 1-2-2V5zm13 4h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5')}Noticias</NavLink>
-        <button onClick={focusSearch}>{icon('M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zm9 2-4-4')}Buscar</button>
       </nav>
     </>
   )
