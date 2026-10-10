@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { httpError } from "./util.js";
 
 // eToro Public API (read-only use): https://api-portal.etoro.com
 // Keys are created in eToro > Settings > Trading > API Key Management.
@@ -15,19 +16,19 @@ async function etoroGet(path) {
     signal: AbortSignal.timeout(20_000),
   });
   if (res.status === 401 || res.status === 403) {
-    throw Object.assign(new Error("eToro rechazó las claves de API (revisa ETORO_API_KEY y ETORO_USER_KEY)"), { status: 502 });
+    throw httpError(502, "eToro rechazó las claves de API (revisa ETORO_API_KEY y ETORO_USER_KEY)");
   }
   if (res.status === 429) {
-    throw Object.assign(new Error("eToro: demasiadas solicitudes, intenta en un minuto"), { status: 429 });
+    throw httpError(429, "eToro: demasiadas solicitudes, intenta en un minuto");
   }
-  if (!res.ok) throw Object.assign(new Error(`eToro respondió ${res.status}`), { status: 502 });
+  if (!res.ok) throw httpError(502, `eToro respondió ${res.status}`);
   return res.json();
 }
 
 // Groups open positions (own + copy-trading) by instrument: total units and
 // unit-weighted average open rate (in the asset's currency). Short positions
 // can't be represented as holdings, so they are reported as skipped.
-export function aggregatePositions(portfolio) {
+function aggregatePositions(portfolio) {
   const own = portfolio?.positions ?? [];
   const copied = (portfolio?.mirrors ?? []).flatMap((m) => m.positions ?? []);
   const byInstrument = new Map();
@@ -51,7 +52,7 @@ export function aggregatePositions(portfolio) {
 
 // eToro symbol -> Yahoo Finance symbol. Stocks and ETFs mostly share the same
 // ticker and exchange suffix (BNP.PA, VOD.L); crypto needs the "-USD" pair.
-export function yahooSymbol(instrument) {
+function yahooSymbol(instrument) {
   const sym = String(instrument.symbolFull ?? "").trim().toUpperCase();
   if (!sym) return null;
   if (instrument.instrumentTypeID === TYPE_CRYPTO) return `${sym.replace(/USD$/, "")}-USD`;
@@ -62,10 +63,7 @@ export function yahooSymbol(instrument) {
 // that could not be converted.
 export async function etoroHoldings() {
   if (!etoroEnabled) {
-    throw Object.assign(
-      new Error("Falta configurar ETORO_API_KEY y ETORO_USER_KEY en el servidor (ver README)"),
-      { status: 400 },
-    );
+    throw httpError(400, "Falta configurar ETORO_API_KEY y ETORO_USER_KEY en el servidor (ver README)");
   }
   const pnl = await etoroGet("/api/v1/trading/info/real/pnl");
   const { positions, shorts } = aggregatePositions(pnl.clientPortfolio);

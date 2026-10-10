@@ -1,17 +1,10 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { METRICS, type MetricInfo } from '../metrics'
-
-export interface PeerMedians {
-  loading: boolean
-  medians: Record<string, number | null>
-  count: number
-}
-
-export const PeerContext = createContext<PeerMedians>({ loading: false, medians: {}, count: 0 })
+import { METRICS, type MetricId, type MetricInfo } from '../metrics'
+import { PeerContext } from './peerContext'
 
 interface Props {
-  id: keyof typeof METRICS
+  id: MetricId
   value: string
   /** Raw numeric value, used to compare against the peer median. */
   raw?: number | null
@@ -73,7 +66,7 @@ function MetricSheet({ info, title, value, median, better, peerCount, onClose }:
 }
 
 export default function MetricStat({ id, value, raw, format, hint, cls, label }: Props) {
-  const info = METRICS[id]
+  const info: MetricInfo = METRICS[id]
   const [open, setOpen] = useState(false)
   const peers = useContext(PeerContext)
   const median = info.peerKey ? peers.medians[info.peerKey] : null

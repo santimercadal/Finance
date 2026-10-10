@@ -1,12 +1,16 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
-import StockPage from './pages/Stock'
-import NewsPage from './pages/News'
-import ReportPrint from './pages/ReportPrint'
 import SymbolSearch from './components/SymbolSearch'
 import Login from './components/Login'
 import { AUTH_EVENT } from './api'
+
+// Secondary pages load on demand so the home screen downloads less on the phone.
+const StockPage = lazy(() => import('./pages/Stock'))
+const NewsPage = lazy(() => import('./pages/News'))
+const ReportPrint = lazy(() => import('./pages/ReportPrint'))
+
+const pageFallback = <main><div className="card"><div className="skeleton" style={{ height: 240 }} /></div></main>
 
 const icon = (d: string) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -46,12 +50,14 @@ export default function App() {
         </nav>
         <SymbolSearch placeholder="Buscar ticker…" onSelect={(s) => navigate(`/accion/${encodeURIComponent(s.symbol)}`)} />
       </header>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/noticias" element={<NewsPage />} />
-        <Route path="/accion/:symbol" element={<StockPage />} />
-        <Route path="/accion/:symbol/informe" element={<ReportPrint />} />
-      </Routes>
+      <Suspense fallback={pageFallback}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/noticias" element={<NewsPage />} />
+          <Route path="/accion/:symbol" element={<StockPage />} />
+          <Route path="/accion/:symbol/informe" element={<ReportPrint />} />
+        </Routes>
+      </Suspense>
       <nav className="bottom-nav" aria-label="Navegación principal">
         <NavLink to="/" end>{icon('M3 7a2 2 0 0 1 2-2h14v14H5a2 2 0 0 1-2-2V7zm0 0h18M15 12h2')}Portafolio</NavLink>
         <button onClick={focusSearch} className={section === 'Acciones' ? 'active' : ''}>{icon('M3 3v18h18M7 15l4-4 3 3 5-6')}Acciones</button>

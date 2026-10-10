@@ -1,17 +1,14 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useApi, type PeerComparison, type Reports, type StockDetail } from '../api'
-import { compact, money, num, pct } from '../format'
-import { METRICS } from '../metrics'
-
-const quarterLabel = (date: string) => {
-  const d = new Date(date)
-  return `T${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`
-}
+import { compact, formatDate, money, num, pct, quarterLabel } from '../format'
+import { metricInfo } from '../metrics'
 
 // Printable one-page quarterly summary. "Guardar como PDF" from the print dialog.
 export default function ReportPrint() {
   const { symbol = '' } = useParams()
   const enc = encodeURIComponent(symbol)
+  const [generatedAt] = useState(() => new Date().toLocaleDateString('es', { dateStyle: 'long' }))
   const detail = useApi<StockDetail>(`/stock/${enc}`)
   const reports = useApi<Reports>(`/stock/${enc}/reports`)
   const peers = useApi<PeerComparison>(`/stock/${enc}/peers`)
@@ -46,7 +43,7 @@ export default function ReportPrint() {
               <h1>{d.quote.name} ({d.symbol})</h1>
               <div className="muted">
                 Informe trimestral resumido · {lastQ >= 0 ? quarterLabel(r.quarterly.dates[lastQ]) : 'sin datos trimestrales'} ·
-                generado el {new Date().toLocaleDateString('es', { dateStyle: 'long' })}
+                generado el {generatedAt}
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -76,7 +73,7 @@ export default function ReportPrint() {
 
           {b && (
             <section>
-              <h2>Estructura patrimonial al {new Date(b.date).toLocaleDateString('es', { dateStyle: 'medium' })}</h2>
+              <h2>Estructura patrimonial al {formatDate(b.date)}</h2>
               <table>
                 <tbody>
                   <tr><td>Activo total</td><td>{compact(b.totalAssets)}</td><td>Pasivo / Activo</td><td>{pct(b.liabilitiesPct, 1, false)}</td></tr>
@@ -101,7 +98,7 @@ export default function ReportPrint() {
                 <tbody>
                   {p.metrics.filter((m) => m.scored).map((m) => (
                     <tr key={m.key}>
-                      <td>{METRICS[m.key]?.name ?? m.key}</td>
+                      <td>{metricInfo(m.key)?.name ?? m.key}</td>
                       <td>{num(m.value, 2)}</td>
                       <td>{num(m.peerMedian, 2)}</td>
                       <td>{m.score ?? '—'}</td>

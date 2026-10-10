@@ -1,9 +1,6 @@
 import type { FundIndicators, StockDetail } from '../api'
-import { compact, money, num, pct, tone } from '../format'
+import { compact, formatDate, money, num, pct, tone } from '../format'
 import MetricStat from './MetricStat'
-
-// Dates come as YYYY-MM-DD; read them at noon so the time zone can't shift the day.
-const date = (d: string | null | undefined) => (d ? new Date(`${d}T12:00:00`).toLocaleDateString('es', { dateStyle: 'medium' }) : '—')
 
 const SECTORS: Record<string, string> = {
   technology: 'Tecnología', financial_services: 'Servicios financieros', communication_services: 'Comunicaciones',
@@ -41,7 +38,7 @@ export default function FundOverview({ d, f }: { d: StockDetail; f: FundIndicato
           <MetricStat id="sharpe" value={num(r.sharpe, 2)} cls={tone(r.sharpe)}
             hint={r.riskFree != null ? `Tasa libre de riesgo ${pct(r.riskFree, 2, false)}` : undefined} />
           <MetricStat id="range52" value={`${num(d.quote.fiftyTwoWeekLow)} – ${num(d.quote.fiftyTwoWeekHigh)}`} />
-          <MetricStat id="inception" value={date(f.inception)} />
+          <MetricStat id="inception" value={formatDate(f.inception)} />
         </div>
       </section>
 
@@ -52,7 +49,7 @@ export default function FundOverview({ d, f }: { d: StockDetail; f: FundIndicato
             <MetricStat id="fundYield" value={pct(f.dividends.yield, 2, false)}
               hint={f.dividends.ttmAmount ? `${money(f.dividends.ttmAmount, d.quote.currency)} en 12 meses` : undefined} />
             <MetricStat id="divFrequency" value={f.dividends.frequency ?? 'No paga'}
-              hint={f.dividends.last ? `Último: ${money(f.dividends.last.amount, d.quote.currency, 3)} el ${date(f.dividends.last.date)}` : undefined} />
+              hint={f.dividends.last ? `Último: ${money(f.dividends.last.amount, d.quote.currency, 3)} el ${formatDate(f.dividends.last.date)}` : undefined} />
             <MetricStat id="expenseRatio" value={pct(f.fund?.expenseRatio, 2, false)} />
             <MetricStat id="fundAssets" value={compact(f.fund?.totalAssets, d.quote.currency)} />
           </div>

@@ -1,6 +1,7 @@
 import { quotes, dailyCloses, fxPerUsd } from "./yahoo.js";
 import { getJSON, setJSON } from "./storage.js";
 import { betaOf } from "./company.js";
+import { changePct, daysAgo } from "./util.js";
 
 const DEFAULT_HOLDINGS = [
   { symbol: "AAPL", shares: 10, avgCost: 180 },
@@ -37,15 +38,13 @@ export async function removeHolding(symbol) {
   return holdings;
 }
 
-const pct = (a, b) => (b ? (a / b - 1) * 100 : null);
-
 // Portfolio snapshot with live prices. All totals are in USD; non-USD holdings
 // are converted at the current FX rate.
 export async function portfolioSnapshot() {
   const holdings = await loadHoldings();
   const qs = await quotes(holdings.map((h) => h.symbol));
   const bySym = Object.fromEntries(qs.map((q) => [q.symbol, q]));
-  const sparkStart = new Date(Date.now() - 31 * 864e5).toISOString().slice(0, 10);
+  const sparkStart = daysAgo(31);
 
   const rows = await Promise.all(
     holdings.map(async (h) => {
@@ -71,8 +70,7 @@ export async function portfolioSnapshot() {
         valueUsd: value,
         costUsd: cost,
         pnlUsd: value != null ? value - cost : null,
-        pnlPct: value != null ? pct(value, cost) : null,
-        marketState: q.marketState,
+        pnlPct: value != null ? changePct(value, cost) : null,
         spark: closes.map((c) => c.close),
       };
     }),
@@ -98,7 +96,7 @@ export async function portfolioSnapshot() {
       value: totalValue,
       cost: totalCost,
       pnl: totalValue - totalCost,
-      pnlPct: pct(totalValue, totalCost),
+      pnlPct: changePct(totalValue, totalCost),
       dayChange,
       dayChangePct: totalValue - dayChange ? (dayChange / (totalValue - dayChange)) * 100 : null,
       best: best && { symbol: best.symbol, pct: best.dayChangePct },
@@ -113,7 +111,7 @@ export async function portfolioSnapshot() {
 // rebased to the same starting value for comparison.
 export async function portfolioHistory() {
   const holdings = await loadHoldings();
-  const start = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+  const start = daysAgo(365);
   const [series, bench] = await Promise.all([
     Promise.all(
       holdings.map(async (h) => {
@@ -150,8 +148,8 @@ export async function portfolioHistory() {
     p.benchmark = benchBase ? (lastBench / benchBase) * base.value : null;
   }
 
-  const valueAt = (daysAgo) => {
-    const target = new Date(Date.now() - daysAgo * 864e5).toISOString().slice(0, 10);
+  const valueAt = (days) => {
+    const target = daysAgo(days);
     return points.find((p) => p.date >= target)?.value;
   };
   const now = points.at(-1)?.value;
@@ -159,11 +157,11 @@ export async function portfolioHistory() {
   return {
     points,
     returns: {
-      "1S": pct(now, valueAt(7)),
-      "1M": pct(now, valueAt(30)),
-      "3M": pct(now, valueAt(91)),
-      YTD: pct(now, ytdStart),
-      "1A": pct(now, points[0]?.value),
+      "1S": changePct(now, valueAt(7)),
+      "1M": changePct(now, valueAt(30)),
+      "3M": changePct(now, valueAt(91)),
+      YTD: changePct(now, ytdStart),
+      "1A": changePct(now, points[0]?.value),
     },
   };
 }

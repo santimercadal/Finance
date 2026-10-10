@@ -1,7 +1,7 @@
 import { cached, HOUR } from "./yahoo.js";
 
 // SEC EDGAR asks every client to identify itself in the User-Agent.
-const SEC_HEADERS = {
+export const SEC_HEADERS = {
   "User-Agent": process.env.SEC_USER_AGENT || "mi-portafolio/1.0 (personal finance app)",
   Accept: "application/json",
 };
@@ -57,4 +57,3 @@ export async function secFilings(symbol) {
 
 // Download proxy only accepts documents from the SEC archive.
 export const isSecDocument = (url) => /^https:\/\/www\.sec\.gov\/Archives\/edgar\/data\/[\w/.-]+$/.test(url);
-export { SEC_HEADERS };

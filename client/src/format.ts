@@ -48,4 +48,30 @@ export function ago(iso: string) {
 
 export const year = (date: string) => date.slice(0, 4)
 
-export const scoreClass = (score: number) => (score >= 67 ? 'good' : score >= 40 ? 'mid' : 'bad')
+// The API sends calendar dates as YYYY-MM-DD. Read them at noon so the local
+// time zone (UTC-3) can't move them to the previous day.
+const asDate = (d: string) => new Date(d.length === 10 ? `${d}T12:00:00` : d)
+
+export const formatDate = (d: string | null | undefined, style: 'medium' | 'long' = 'medium') =>
+  d ? asDate(d).toLocaleDateString('es', { dateStyle: style }) : '—'
+
+export const monthLabel = (d: string) => asDate(d).toLocaleDateString('es', { month: 'short', year: '2-digit' })
+
+export const quarterLabel = (d: string) => {
+  const date = asDate(d)
+  return `T${Math.floor(date.getMonth() / 3) + 1} ${date.getFullYear()}`
+}
+
+const RATINGS: Record<string, [label: string, tone: string]> = {
+  BUY: ['Comprar', 'up'],
+  STRONG_BUY: ['Compra fuerte', 'up'],
+  HOLD: ['Mantener', 'mid'],
+  SELL: ['Vender', 'down'],
+  STRONG_SELL: ['Venta fuerte', 'down'],
+}
+
+// Analyst rating ("BUY", "hold"…) -> [Spanish label, tone class].
+export const ratingLabel = (rating: string | null): [string, string] | null =>
+  rating ? RATINGS[rating.toUpperCase()] ?? [rating, ''] : null
+
+export const scoreClass =(score: number) => (score >= 67 ? 'good' : score >= 40 ? 'mid' : 'bad')

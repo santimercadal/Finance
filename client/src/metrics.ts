@@ -13,7 +13,7 @@ export interface MetricInfo {
   ref?: string
 }
 
-export const METRICS: Record<string, MetricInfo> = {
+export const METRICS = {
   marketCap: {
     name: 'Capitalización bursátil',
     what: 'Valor de mercado de todas las acciones de la empresa (precio × cantidad de acciones).',
@@ -25,12 +25,6 @@ export const METRICS: Record<string, MetricInfo> = {
     use: 'Mide si la acción está cara o barata respecto de lo que gana. Un P/E alto implica que el mercado espera crecimiento.',
     comparable: true, better: 'low', peerKey: 'pe',
     ref: 'Depende mucho del sector: compárala siempre con empresas similares.',
-  },
-  forwardPe: {
-    name: 'P/E proyectado (forward)',
-    what: 'Precio dividido por la ganancia por acción que estiman los analistas para los próximos 12 meses.',
-    use: 'Muestra la valuación mirando hacia adelante. Si es menor que el P/E actual, se esperan ganancias mayores.',
-    comparable: true, better: 'low', peerKey: 'forwardPe',
   },
   pb: {
     name: 'Precio / Valor libro (P/B)',
@@ -307,4 +301,9 @@ export const METRICS: Record<string, MetricInfo> = {
     what: 'Primer día de cotización del activo según Yahoo Finance.',
     use: 'Un historial más largo da más confianza a los indicadores de riesgo y rendimiento.',
   },
-}
+} satisfies Record<string, MetricInfo>
+
+export type MetricId = keyof typeof METRICS
+
+// Lookup by a key that comes from the API (not checked at compile time).
+export const metricInfo = (key: string): MetricInfo | undefined => (METRICS as Record<string, MetricInfo>)[key]

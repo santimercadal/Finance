@@ -1,8 +1,6 @@
 import { dailyHistory, optionalSummary, quotes } from "./yahoo.js";
-import { betaOf, num } from "./company.js";
-
-const pct = (a, b) => (num(a) != null && num(b) ? (a / b - 1) * 100 : null);
-const daysAgo = (n) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
+import { betaOf } from "./company.js";
+import { num, changePct, daysAgo } from "./util.js";
 
 // Close on or right after `date` (first trading day of the window).
 const closeFrom = (closes, date) => closes.find((c) => c.date >= date)?.close ?? null;
@@ -71,7 +69,7 @@ export async function fundIndicators(symbol, quote) {
   const year = closes.filter((c) => c.date >= daysAgo(365));
   const yearReturns = [...dailyReturns(year).values()];
   const volatility = yearReturns.length > 20 ? stdev(yearReturns) * Math.sqrt(periodsPerYear) * 100 : null;
-  const return1y = pct(last, closeFrom(closes, daysAgo(365)));
+  const return1y = changePct(last, closeFrom(closes, daysAgo(365)));
   // Risk-free rate: 13-week US T-bill yield (^IRX quotes the rate in percent).
   const riskFree = rf?.regularMarketPrice ?? null;
 
@@ -91,9 +89,9 @@ export async function fundIndicators(symbol, quote) {
   return {
     kind: isEtf ? "etf" : "crypto",
     returns: {
-      "1M": pct(last, closeFrom(closes, daysAgo(30))),
-      "3M": pct(last, closeFrom(closes, daysAgo(91))),
-      YTD: pct(last, closeFrom(closes, `${new Date().getFullYear()}-01-01`)),
+      "1M": changePct(last, closeFrom(closes, daysAgo(30))),
+      "3M": changePct(last, closeFrom(closes, daysAgo(91))),
+      YTD: changePct(last, closeFrom(closes, `${new Date().getFullYear()}-01-01`)),
       "1A": return1y,
       "3A anual": annualized(closes, 3),
       "5A anual": annualized(closes, 5),

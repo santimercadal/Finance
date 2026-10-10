@@ -5,10 +5,11 @@ import {
   ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { useApi, type AnalystView, type BalanceRow, type NewsItem, type PeerComparison, type StockDetail } from '../api'
-import { compact, money, num, pct, scoreClass, tone, year } from '../format'
+import { compact, formatDate, money, monthLabel, num, pct, scoreClass, tone, year } from '../format'
 import ChartTip from '../components/ChartTip'
 import NewsList from '../components/NewsList'
-import MetricStat, { PeerContext } from '../components/MetricStat'
+import MetricStat from '../components/MetricStat'
+import { PeerContext } from '../components/peerContext'
 import Competition from '../components/Competition'
 import ReportsPanel from '../components/ReportsPanel'
 import FundOverview from '../components/FundOverview'
@@ -45,8 +46,7 @@ function RatioBar({ label, parts }: { label: string; parts: [string, number | nu
   )
 }
 
-const axis ={ tick: { fill: 'var(--muted)', fontSize: 11 }, tickLine: false }
-
+const axis = { tick: { fill: 'var(--muted)', fontSize: 11 }, tickLine: false }
 
 function Overview({ d }: { d: StockDetail }) {
   const first = d.chart[0]?.close
@@ -70,9 +70,9 @@ function Overview({ d }: { d: StockDetail }) {
               </defs>
               <CartesianGrid stroke="var(--grid)" vertical={false} />
               <XAxis dataKey="date" {...axis} axisLine={{ stroke: 'var(--axis)' }} minTickGap={50}
-                tickFormatter={(v: string) => new Date(v).toLocaleDateString('es', { month: 'short', year: '2-digit' })} />
+                tickFormatter={monthLabel} />
               <YAxis {...axis} axisLine={false} width={56} domain={['auto', 'auto']} tickFormatter={(v: number) => num(v, 0)} />
-              <Tooltip content={<ChartTip format={(v) => money(v, d.quote.currency)} labelFormat={(l) => new Date(l).toLocaleDateString('es', { dateStyle: 'medium' })} />} />
+              <Tooltip content={<ChartTip format={(v) => money(v, d.quote.currency)} labelFormat={formatDate} />} />
               <Area type="monotone" dataKey="close" name="Cierre" stroke="var(--s1)" strokeWidth={2} fill="url(#px)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
@@ -199,7 +199,7 @@ function Structure({ d }: { d: StockDetail }) {
         <section className="card">
           <div className="card-head">
             <h2>Activos = Pasivos + Patrimonio</h2>
-            <span className="small muted">Balance al {new Date(b.date).toLocaleDateString('es', { dateStyle: 'medium' })} · {cur}</span>
+            <span className="small muted">Balance al {formatDate(b.date)} · {cur}</span>
           </div>
           <EquationBar b={b} cur={cur} />
         </section>

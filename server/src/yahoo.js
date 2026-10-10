@@ -1,4 +1,5 @@
 import YahooFinance from "yahoo-finance2";
+import { isoDate } from "./util.js";
 
 export const yf = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
 
@@ -46,7 +47,7 @@ function chartQuote(symbol) {
       quoteType: m.instrumentType ?? null,
       // The library may already convert it to a Date; otherwise it's epoch seconds.
       firstTradeDate: m.firstTradeDate
-        ? (m.firstTradeDate instanceof Date ? m.firstTradeDate : new Date(m.firstTradeDate * 1000)).toISOString().slice(0, 10)
+        ? isoDate(m.firstTradeDate instanceof Date ? m.firstTradeDate : m.firstTradeDate * 1000)
         : null,
       shortName: m.shortName,
       longName: m.longName,
@@ -105,8 +106,8 @@ export function dailyHistory(symbol, period1) {
     return {
       closes: c.quotes
         .filter((q) => q.close != null)
-        .map((q) => ({ date: new Date(q.date).toISOString().slice(0, 10), close: q.adjclose ?? q.close, price: q.close })),
-      dividends: (c.events?.dividends ?? []).map((d) => ({ date: new Date(d.date).toISOString().slice(0, 10), amount: d.amount })),
+        .map((q) => ({ date: isoDate(q.date), close: q.adjclose ?? q.close, price: q.close })),
+      dividends: (c.events?.dividends ?? []).map((d) => ({ date: isoDate(d.date), amount: d.amount })),
     };
   });
 }
@@ -143,7 +144,7 @@ export function dailyCloses(symbol, period1) {
     const c = await yf.chart(symbol, { period1, interval: "1d" }, { validateResult: false });
     return c.quotes
       .filter((q) => q.close != null)
-      .map((q) => ({ date: new Date(q.date).toISOString().slice(0, 10), close: q.adjclose ?? q.close }));
+      .map((q) => ({ date: isoDate(q.date), close: q.adjclose ?? q.close }));
   });
 }
 

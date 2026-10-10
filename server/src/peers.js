@@ -1,11 +1,11 @@
 import { yf, cached, quotes, crumbBlocked, blockCrumb, MIN, HOUR } from "./yahoo.js";
 import { companySnapshot } from "./company.js";
-import { askAI, aiEnabled } from "./news.js";
-import { getJSON, setJSON, storageKind } from "./storage.js";
+import { askAI, aiEnabled, parseJsonAnswer } from "./ai.js";
+import { recall, remember } from "./storage.js";
 
 // Metrics used to compare a company against its competitors.
 // better: "high" = more is better, "low" = less is better.
-export const PEER_METRICS = [
+const PEER_METRICS = [
   { key: "pe", category: "Valuación", better: "low", positiveOnly: true },
   { key: "pb", category: "Valuación", better: "low", positiveOnly: true },
   { key: "evToEbitda", category: "Valuación", better: "low", positiveOnly: true },
@@ -51,25 +51,19 @@ async function industryCompanies(industry) {
 async function aiCompetitors(snap) {
   if (!aiEnabled) return [];
   const storeKey = `peers:ai:${snap.symbol}`;
-  const persist = storageKind === "upstash";
-  if (persist) {
-    const saved = await getJSON(storeKey).catch(() => null);
-    if (saved) return saved;
-  }
+  const saved = await recall(storeKey);
+  if (saved) return saved;
   const answer = await askAI(
     "Eres un analista bursátil. Respondes solo con JSON válido, sin texto adicional.",
     `Lista los 6 principales competidores directos que cotizan en bolsa de ${snap.profile.name} (ticker ${snap.symbol}, industria: ${snap.profile.industry ?? "desconocida"}, sector: ${snap.profile.sector ?? "desconocido"}). Prioriza empresas del mismo negocio y tamaño comparable. Usa los tickers tal como aparecen en Yahoo Finance (por ejemplo PEP, KDP, NSRGY, 7203.T). Formato: {"tickers": ["AAA", "BBB"]}`,
   ).catch(() => null);
-  const json = answer?.match(/\{[\s\S]*\}/)?.[0];
-  let tickers = [];
-  try {
-    tickers = (JSON.parse(json ?? "{}").tickers ?? []).map((t) => String(t).trim().toUpperCase()).filter((t) => /^[A-Z0-9.^=-]{1,12}$/.test(t));
-  } catch {
-    return [];
-  }
+  const answerTickers = parseJsonAnswer(answer)?.tickers;
+  const tickers = (Array.isArray(answerTickers) ? answerTickers : [])
+    .map((t) => String(t).trim().toUpperCase())
+    .filter((t) => /^[A-Z0-9.^=-]{1,12}$/.test(t));
   // Keep only tickers Yahoo actually knows.
   const valid = (await quotes(tickers)).map((q) => q.symbol.toUpperCase());
-  if (persist && valid.length) await setJSON(storeKey, valid, 7 * 24 * 3600).catch(() => {});
+  if (valid.length) await remember(storeKey, valid, 7 * 24 * 3600);
   return valid;
 }
 

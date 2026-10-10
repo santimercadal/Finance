@@ -1,8 +1,8 @@
 import { insights } from "./yahoo.js";
-import { askAI, aiEnabled } from "./news.js";
-import { getJSON, setJSON, storageKind } from "./storage.js";
+import { askAI, aiEnabled, parseJsonAnswer } from "./ai.js";
+import { recall, remember } from "./storage.js";
+import { isoDate } from "./util.js";
 
-const persist = storageKind === "upstash";
 const clean = (s) => String(s ?? "").replace(/\s+/g, " ").trim();
 
 // Morningstar writes the bull/bear case in English; translate once per report
@@ -24,10 +24,8 @@ function translate(symbol, publishDate, bull, bear) {
 }
 
 async function translateNow(key, bull, bear) {
-  if (persist) {
-    const saved = await getJSON(key).catch(() => null);
-    if (saved) return saved;
-  }
+  const saved = await recall(key);
+  if (saved) return saved;
   const text = await askAI(
     "Eres un traductor financiero. Traduces al español de forma fiel, sin agregar ni quitar información.",
     `Traduce al español cada punto manteniendo el mismo orden y cantidad. Responde SOLO con JSON válido con la forma {"bull": ["..."], "bear": ["..."]}.\n\n${JSON.stringify({ bull, bear })}`,
@@ -35,21 +33,17 @@ async function translateNow(key, bull, bear) {
     console.error("AI translation failed:", err.message);
     return null;
   });
-  const json = text?.match(/\{[\s\S]*\}/)?.[0];
-  try {
-    const parsed = JSON.parse(json);
-    if (parsed.bull?.length !== bull.length || parsed.bear?.length !== bear.length) return null;
-    const result = { bull: parsed.bull.map(clean), bear: parsed.bear.map(clean) };
-    if (persist) await setJSON(key, result, 90 * 24 * 3600).catch(() => {});
-    return result;
-  } catch {
-    return null;
-  }
+  const parsed = parseJsonAnswer(text);
+  if (!Array.isArray(parsed?.bull) || !Array.isArray(parsed?.bear)) return null;
+  if (parsed.bull.length !== bull.length || parsed.bear.length !== bear.length) return null;
+  const result = { bull: parsed.bull.map(clean), bear: parsed.bear.map(clean) };
+  await remember(key, result, 90 * 24 * 3600);
+  return result;
 }
 
 const DIRECTION = { Bullish: "alcista", Bearish: "bajista", Neutral: "neutral" };
 const VALUATION = { Overvalued: "Sobrevalorada", Undervalued: "Infravalorada", "Near Fair Value": "Cerca de su valor justo" };
-const outlook =(o) => (o?.direction ? { direction: DIRECTION[o.direction] ?? o.direction, score: o.score ?? null } : null);
+const outlook = (o) => (o?.direction ? { direction: DIRECTION[o.direction] ?? o.direction, score: o.score ?? null } : null);
 
 // Analyst view of a stock from Yahoo's research feed: Morningstar bull/bear
 // case (pros and cons), Argus rating and price target, Trading Central outlook.
@@ -79,7 +73,7 @@ export async function analystView(symbol) {
       cons: es?.bear ?? bear,
       translated: Boolean(es),
       prosConsSource: bull.length || bear.length ? "Morningstar" : null,
-      prosConsDate: publishDate ? new Date(publishDate).toISOString().slice(0, 10) : null,
+      prosConsDate: publishDate ? isoDate(publishDate) : null,
       rating: rec?.rating ?? null,
       targetPrice: rec?.targetPrice ?? null,
       ratingSource: rec?.provider ?? null,

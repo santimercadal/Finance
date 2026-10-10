@@ -19,14 +19,13 @@ function fetchSummary(n: NewsItem) {
   return p
 }
 
-function NewsRow({ item, withSummary }: { item: NewsItem; withSummary: boolean }) {
+function NewsRow({ item }: { item: NewsItem }) {
   const [summary, setSummary] = useState<Summary | null>(null)
   useEffect(() => {
-    if (!withSummary) return
     let alive = true
     fetchSummary(item).then((s) => alive && setSummary(s))
     return () => { alive = false }
-  }, [item, withSummary])
+  }, [item])
 
   return (
     <article className="news-item">
@@ -39,12 +38,10 @@ function NewsRow({ item, withSummary }: { item: NewsItem; withSummary: boolean }
           ))}
           {summary?.source === 'ai' && <span className="chip" title="Resumen generado con IA">✨ IA</span>}
         </div>
-        {withSummary && (
-          summary ? (
-            summary.summary && <div className="summary">{summary.summary}</div>
-          ) : (
-            <><div className="skeleton" style={{ width: '95%' }} /><div className="skeleton" style={{ width: '70%' }} /></>
-          )
+        {summary ? (
+          summary.summary && <div className="summary">{summary.summary}</div>
+        ) : (
+          <><div className="skeleton" style={{ width: '95%' }} /><div className="skeleton" style={{ width: '70%' }} /></>
         )}
       </div>
       {item.thumbnail && <img src={item.thumbnail} alt="" loading="lazy" />}
@@ -52,11 +49,11 @@ function NewsRow({ item, withSummary }: { item: NewsItem; withSummary: boolean }
   )
 }
 
-export default function NewsList({ items, withSummary = true }: { items: NewsItem[]; withSummary?: boolean }) {
+export default function NewsList({ items }: { items: NewsItem[] }) {
   if (!items.length) return <div className="empty">No hay noticias por ahora.</div>
   return (
     <div className="news-list">
-      {items.map((n) => <NewsRow key={n.id} item={n} withSummary={withSummary} />)}
+      {items.map((n) => <NewsRow key={n.id} item={n} />)}
     </div>
   )
 }

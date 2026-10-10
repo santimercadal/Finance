@@ -13,16 +13,19 @@ export default function SymbolSearch({ placeholder, onSelect, className = 'searc
   const [open, setOpen] = useState(false)
   const [hl, setHl] = useState(0)
 
+  const term = q.trim()
+  // Results of a previous term stay in state; only show them while there is a term.
+  const visible = term ? results : []
+
   useEffect(() => {
-    const term = q.trim()
-    if (!term) return setResults([])
+    if (!term) return
     const id = setTimeout(() => {
       api<SearchResult[]>(`/search?q=${encodeURIComponent(term)}`)
         .then((r) => { setResults(r); setHl(0) })
         .catch(() => setResults([]))
     }, 250)
     return () => clearTimeout(id)
-  }, [q])
+  }, [term])
 
   const pick = (r: SearchResult) => {
     onSelect(r)
@@ -41,18 +44,18 @@ export default function SymbolSearch({ placeholder, onSelect, className = 'searc
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         onKeyDown={(e) => {
-          if (e.key === 'ArrowDown') { e.preventDefault(); setHl((h) => Math.min(h + 1, results.length - 1)) }
+          if (e.key === 'ArrowDown') { e.preventDefault(); setHl((h) => Math.min(h + 1, visible.length - 1)) }
           if (e.key === 'ArrowUp') { e.preventDefault(); setHl((h) => Math.max(h - 1, 0)) }
           if (e.key === 'Enter') {
-            if (results[hl]) pick(results[hl])
-            else if (q.trim()) pick({ symbol: q.trim().toUpperCase(), name: '', type: '', exchange: '' })
+            if (visible[hl]) pick(visible[hl])
+            else if (term) pick({ symbol: term.toUpperCase(), name: '', type: '', exchange: '' })
           }
           if (e.key === 'Escape') setOpen(false)
         }}
       />
-      {open && results.length > 0 && (
+      {open && visible.length > 0 && (
         <div className="search-results">
-          {results.map((r, i) => (
+          {visible.map((r, i) => (
             <button key={r.symbol} className={i === hl ? 'hl' : ''} onMouseDown={() => pick(r)}>
               <span><b>{r.symbol}</b> <span className="muted small">{r.name}</span></span>
               <span className="muted small">{r.exchange}</span>

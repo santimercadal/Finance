@@ -1,9 +1,9 @@
 import { dailyCloses, optionalSummary, quotes, profileOf } from "./yahoo.js";
 import { fundIndicators } from "./etf.js";
-import { fundamentals, companySnapshot, num } from "./company.js";
+import { fundamentals, companySnapshot } from "./company.js";
 import { secFilings } from "./sec.js";
+import { num, div, ratioPct, daysAgo, isoDate } from "./util.js";
 
-const div = (a, b) => (num(a) != null && num(b) ? a / b : null);
 const first = (row, ...keys) => {
   for (const k of keys) if (num(row?.[k]) != null) return row[k];
   return null;
@@ -32,8 +32,8 @@ function balance(r) {
     totalDebt: first(r, "totalDebt"),
     equity,
     assetsPct: 100,
-    liabilitiesPct: div(totalLiabilities, totalAssets) * 100 || null,
-    equityPct: div(equity, totalAssets) * 100 || null,
+    liabilitiesPct: ratioPct(totalLiabilities, totalAssets),
+    equityPct: ratioPct(equity, totalAssets),
     currentRatio: div(first(r, "currentAssets"), first(r, "currentLiabilities")),
     debtToEquity: div(first(r, "totalDebt"), equity),
     workingCapital: first(r, "workingCapital"),
@@ -135,7 +135,7 @@ export async function stockReports(symbol) {
     symbol,
     name: snap.profile.name,
     currency: snap.financialCurrency,
-    nextEarnings: earningsDate ? new Date(earningsDate).toISOString().slice(0, 10) : null,
+    nextEarnings: earningsDate ? isoDate(earningsDate) : null,
     filings,
     quarterly: {
       dates: quarters.map((q) => q.date),
@@ -184,7 +184,7 @@ async function fundDetail(symbol, quote, start) {
 
 export async function stockDetail(symbol) {
   symbol = symbol.toUpperCase();
-  const start = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+  const start = daysAgo(365);
   const [q] = await quotes([symbol]);
   if (q && FUND_TYPES.has(q.quoteType)) return fundDetail(symbol, q, start);
   const [snap, extra, annual, quarterly, chart] = await Promise.all([

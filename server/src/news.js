@@ -1,19 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { yf, cached, MIN, HOUR } from "./yahoo.js";
-import { getJSON, setJSON, storageKind } from "./storage.js";
-
-// AI provider for summaries. Groq has a free tier (open models, no card);
-// Claude is the paid option. Groq wins when both keys are configured.
-const GROQ_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
-const CLAUDE_MODEL = "claude-opus-5-5";
-const hasClaude = Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
-export const aiProvider = GROQ_KEY ? "groq" : hasClaude ? "claude" : null;
-export const aiEnabled = aiProvider != null;
-const claude = aiProvider === "claude" ? new Anthropic() : null;
-
-// After a rate-limit response, skip AI calls until this time (free tiers have daily caps).
-let aiPausedUntil = 0;
+import { askAI, aiEnabled } from "./ai.js";
+import { recall, remember } from "./storage.js";
 
 const MARKET_QUERIES = ["stock market", "Federal Reserve", "economy"];
 
@@ -87,73 +74,15 @@ function extractiveSummary({ paragraphs, description }) {
   return end > 200 ? cut.slice(0, end + 1) : `${cut.slice(0, cut.lastIndexOf(" "))}…`;
 }
 
-function textOf(response) {
-  if (response.stop_reason === "refusal") return null;
-  return response.content
-    .filter((b) => b.type === "text")
-    .map((b) => b.text)
-    .join("")
-    .trim();
-}
-
-async function askGroq(system, prompt) {
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${GROQ_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      // gpt-oss models reason before answering; keep it short to save the free quota.
-      ...(GROQ_MODEL.includes("gpt-oss") ? { reasoning_effort: "low" } : {}),
-      max_completion_tokens: 2000,
-      temperature: 0.2,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: prompt },
-      ],
-    }),
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (res.status === 429) {
-    const retry = Number(res.headers.get("retry-after")) || 60;
-    aiPausedUntil = Date.now() + Math.min(retry, 3600) * 1000;
-    throw new Error(`Groq: límite gratuito alcanzado, reintento en ${retry}s`);
-  }
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`Groq ${res.status}: ${body.error?.message ?? "error"}`);
-  return body.choices?.[0]?.message?.content?.trim() || null;
-}
-
-async function askClaude(system, prompt) {
-  // Server-side fallback re-runs the request on another model if the primary declines.
-  const response = await claude.beta.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: 4000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    output_config: { effort: "low" },
-    system,
-    messages: [{ role: "user", content: prompt }],
-  });
-  return textOf(response);
-}
-
-export function askAI(system, prompt) {
-  if (Date.now() < aiPausedUntil) return Promise.resolve(null);
-  return aiProvider === "groq" ? askGroq(system, prompt) : askClaude(system, prompt);
-}
-
-// Summaries are also stored in the database (when configured) so they survive
-// server restarts and each article is summarized only once.
 const SUMMARY_TTL_SECONDS = 7 * 24 * 3600;
-const persist = storageKind === "upstash";
 
-// Summary of a single article: AI when a provider is configured, otherwise
-// the first sentences of the article.
+// Summary of a single article: AI when available (stored so each article is
+// summarized only once), otherwise the first sentences of the article.
 export function articleSummary(url, title) {
   return cached(`summary:${url}`, 24 * HOUR, async () => {
     const storeKey = `summary:${url}`;
-    if (persist && aiEnabled) {
-      const saved = await getJSON(storeKey).catch(() => null);
+    if (aiEnabled) {
+      const saved = await recall(storeKey);
       if (saved) return saved;
     }
     let article = { paragraphs: [], description: null };
@@ -162,8 +91,8 @@ export function articleSummary(url, title) {
     } catch {
       // Article blocked or unreachable: fall back to the headline only.
     }
-    // Free tiers cap tokens per day, so send only the first part of the article.
-    const body = article.paragraphs.join("\n").slice(0, aiProvider === "groq" ? 5_000 : 12_000);
+    // The free tier caps tokens per day, so send only the first part of the article.
+    const body = article.paragraphs.join("\n").slice(0, 5_000);
     if (aiEnabled && body.length > 200) {
       try {
         const summary = await askAI(
@@ -172,7 +101,7 @@ export function articleSummary(url, title) {
         );
         if (summary) {
           const result = { summary, source: "ai" };
-          if (persist) await setJSON(storeKey, result, SUMMARY_TTL_SECONDS).catch(() => {});
+          await remember(storeKey, result, SUMMARY_TTL_SECONDS);
           return result;
         }
       } catch (err) {
@@ -183,15 +112,14 @@ export function articleSummary(url, title) {
   });
 }
 
-// Short market briefing over the latest headlines (requires an AI provider).
+// Short market briefing over the latest headlines (requires AI).
 export function dailyDigest(news) {
   if (!aiEnabled) return Promise.resolve(null);
-  const headlines = news
-    .slice(0, 30)
+  const latest = news.slice(0, 30);
+  const headlines = latest
     .map((n) => `- [${n.time.slice(0, 16).replace("T", " ")}] ${n.title} (${n.publisher}${n.tickers.length ? `; ${n.tickers.slice(0, 4).join(", ")}` : ""})`)
     .join("\n");
-  const key = `digest:${news.slice(0, 30).map((n) => n.id).join(",")}`;
-  return cached(key, 30 * MIN, () =>
+  return cached(`digest:${latest.map((n) => n.id).join(",")}`, 30 * MIN, () =>
     askAI(
       "Eres un analista financiero que escribe un briefing de mercado breve en español.",
       `Con estos titulares, escribe un resumen del día en 3 a 5 viñetas cortas de una o dos oraciones (empezando con "- "): qué está moviendo al mercado y qué eventos próximos conviene seguir. Básate sólo en lo que dicen los titulares, sin interpretar más allá de ellos, y no des recomendaciones de compra, venta ni de cómo posicionarse. Texto plano, sin markdown.\n\n${headlines}`,

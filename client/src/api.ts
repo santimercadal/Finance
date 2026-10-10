@@ -84,7 +84,7 @@ export interface BalanceRow {
   workingCapital: number | null
 }
 
-export interface CashFlowRow {
+interface CashFlowRow {
   date: string
   operating: number | null
   investing: number | null
@@ -101,7 +101,7 @@ export interface CashFlowRow {
   revenue: number | null
 }
 
-export interface DebtRow {
+interface DebtRow {
   date: string
   totalDebt: number | null
   netDebt: number | null
@@ -201,7 +201,7 @@ export interface SearchResult {
   exchange: string
 }
 
-export interface PeerCompany {
+interface PeerCompany {
   symbol: string
   name: string
   industry?: string
@@ -263,32 +263,46 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T
 }
 
-// Fetch helper with loading/error state and an optional auto-refresh interval.
-export function useApi<T>(path: string | null, refreshMs?: number) {
-  const [data, setData] = useState<T | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+interface ApiState<T> {
+  path: string | null
+  data: T | null
+  error: string | null
+  updatedAt: Date | null
+}
 
-  const load = useCallback(async () => {
-    if (!path) return
-    try {
-      setData(await api<T>(path))
-      setError(null)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }, [path])
+// Fetch helper with loading/error state and an optional auto-refresh interval.
+// Results are tagged with their path, so when the path changes the previous
+// data is hidden right away and late responses for an old path are ignored.
+export function useApi<T>(path: string | null, refreshMs?: number) {
+  const [state, setState] = useState<ApiState<T>>({ path: null, data: null, error: null, updatedAt: null })
+  const [version, setVersion] = useState(0)
 
   useEffect(() => {
-    setLoading(true)
-    setData(null)
+    if (!path) return
+    let active = true
+    const load = () =>
+      api<T>(path).then(
+        (data) => active && setState({ path, data, error: null, updatedAt: new Date() }),
+        (e: Error) =>
+          active &&
+          // Keep the last good data for this path: a failed refresh shouldn't blank the page.
+          setState((s) => (s.path === path ? { ...s, error: e.message } : { path, data: null, error: e.message, updatedAt: null })),
+      )
     load()
-    if (!refreshMs) return
-    const id = setInterval(load, refreshMs)
-    return () => clearInterval(id)
-  }, [load, refreshMs])
+    const id = refreshMs ? setInterval(load, refreshMs) : undefined
+    return () => {
+      active = false
+      clearInterval(id)
+    }
+  }, [path, refreshMs, version])
 
-  return { data, error, loading, reload: load }
+  const reload = useCallback(() => setVersion((v) => v + 1), [])
+  const current = state.path === path
+  return {
+    data: current ? state.data : null,
+    error: current ? state.error : null,
+    loading: path != null && !current,
+    updatedAt: current ? state.updatedAt : null,
+    reload,
+  }
 }

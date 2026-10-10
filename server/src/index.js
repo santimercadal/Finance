@@ -3,21 +3,22 @@ import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import express from "express";
-import cors from "cors";
 import { yf, cached, quotes, MIN } from "./yahoo.js";
 import { portfolioSnapshot, portfolioHistory, loadHoldings, saveHoldings, upsertHolding, removeHolding } from "./portfolio.js";
 import { stockDetail, stockReports } from "./stock.js";
 import { peerComparison } from "./peers.js";
 import { isSecDocument, SEC_HEADERS } from "./sec.js";
-import { newsFeed, articleSummary, dailyDigest, aiEnabled, aiProvider } from "./news.js";
+import { newsFeed, articleSummary, dailyDigest } from "./news.js";
+import { aiEnabled, aiProvider } from "./ai.js";
 import { storageKind, storageWritable, getJSON, setJSON } from "./storage.js";
 import { etoroEnabled, etoroHoldings } from "./etoro.js";
 import { analystView } from "./analysts.js";
+import { httpError } from "./util.js";
 
 const app = express();
+app.disable("x-powered-by");
 app.set("trust proxy", 1);
-if (process.env.NODE_ENV !== "production") app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "200kb" }));
 
 // Optional password: when APP_PASSWORD is set every /api call (except health)
 // must send it in the x-app-key header. Required when the app is public.
@@ -59,7 +60,6 @@ app.get("/api/health", async (_req, res) => {
 });
 app.get("/api/auth/check", (_req, res) => res.json({ ok: true }));
 
-
 app.get("/api/market", wrap(async () => {
   const qs = await quotes(INDICATORS.map((i) => i.symbol));
   const bySym = Object.fromEntries(qs.map((q) => [q.symbol, q]));
@@ -79,10 +79,10 @@ app.get("/api/portfolio/history", wrap(() => portfolioHistory()));
 app.post("/api/portfolio", wrap(async (req) => {
   const { symbol, shares, avgCost } = req.body ?? {};
   if (!symbol || !(Number(shares) > 0) || !(Number(avgCost) >= 0)) {
-    throw Object.assign(new Error("Datos inválidos: se requiere símbolo, cantidad > 0 y costo promedio"), { status: 400 });
+    throw httpError(400, "Datos inválidos: se requiere símbolo, cantidad > 0 y costo promedio");
   }
   const [q] = await quotes([String(symbol).toUpperCase()]);
-  if (!q?.regularMarketPrice) throw Object.assign(new Error(`Símbolo no encontrado: ${symbol}`), { status: 404 });
+  if (!q?.regularMarketPrice) throw httpError(404, `Símbolo no encontrado: ${symbol}`);
   return upsertHolding({ symbol, shares, avgCost });
 }));
 app.delete("/api/portfolio/:symbol", wrap((req) => removeHolding(req.params.symbol)));
@@ -97,7 +97,7 @@ async function replaceHoldings(rows, { skipMissing = false } = {}) {
     const shares = Number(r.shares);
     const avgCost = Number(r.avgCost);
     if (!symbol || !(shares > 0) || !(avgCost >= 0)) {
-      throw Object.assign(new Error(`Fila inválida: ${JSON.stringify(r)}`), { status: 400 });
+      throw httpError(400, `Fila inválida: ${JSON.stringify(r)}`);
     }
     const prev = merged.get(symbol);
     if (prev) {
@@ -107,14 +107,14 @@ async function replaceHoldings(rows, { skipMissing = false } = {}) {
       merged.set(symbol, { symbol, shares, avgCost });
     }
   }
-  if (!merged.size) throw Object.assign(new Error("La lista está vacía"), { status: 400 });
+  if (!merged.size) throw httpError(400, "La lista está vacía");
   const found = new Set((await quotes([...merged.keys()])).map((q) => q.symbol.toUpperCase()));
   const missing = [...merged.keys()].filter((s) => !found.has(s));
   if (missing.length && !skipMissing) {
-    throw Object.assign(new Error(`No se encontraron en Yahoo Finance: ${missing.join(", ")}`), { status: 404 });
+    throw httpError(404, `No se encontraron en Yahoo Finance: ${missing.join(", ")}`);
   }
   const holdings = [...merged.values()].filter((h) => found.has(h.symbol));
-  if (!holdings.length) throw Object.assign(new Error("Ninguna posición se encontró en Yahoo Finance"), { status: 404 });
+  if (!holdings.length) throw httpError(404, "Ninguna posición se encontró en Yahoo Finance");
   await saveHoldings(holdings);
   return { holdings, missing };
 }
@@ -127,7 +127,7 @@ app.put("/api/portfolio", wrap(async (req) => {
 // Replaces the portfolio with the open positions of the eToro real account.
 app.post("/api/portfolio/sync/etoro", wrap(async () => {
   const { holdings: rows, skipped, shorts, cash } = await etoroHoldings();
-  if (!rows.length) throw Object.assign(new Error("La cuenta de eToro no tiene posiciones abiertas"), { status: 404 });
+  if (!rows.length) throw httpError(404, "La cuenta de eToro no tiene posiciones abiertas");
   const { holdings, missing } = await replaceHoldings(rows, { skipMissing: true });
   const names = new Map(rows.map((r) => [r.symbol, r.name]));
   await setJSON("etoro-last-sync", { at: new Date().toISOString(), count: holdings.length }).catch(() => {});
@@ -215,8 +215,11 @@ app.get("/api/news/digest", wrap(async () => {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const webDist = path.join(here, "..", "..", "client", "dist");
 if (fs.existsSync(webDist)) {
+  // Built files have a content hash in their name, so they never change: cache for good.
+  app.use("/assets", express.static(path.join(webDist, "assets"), { immutable: true, maxAge: "1y" }));
   app.use(express.static(webDist, { index: false, maxAge: "1h" }));
-  app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile(path.join(webDist, "index.html")));
+  // index.html is revalidated on every visit so a new deploy shows up right away.
+  app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile(path.join(webDist, "index.html"), { headers: { "Cache-Control": "no-cache" } }));
 }
 
 const PORT = Number(process.env.PORT) || 3001;

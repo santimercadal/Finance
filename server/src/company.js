@@ -1,20 +1,17 @@
-import { yf, cached, quotes, fxPerUsd, profileOf, financialCurrency, HOUR } from "./yahoo.js";
-export const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
-const div = (a, b) => (num(a) != null && num(b) ? a / b : null);
-const pct = (a, b) => (div(a, b) != null ? (a / b) * 100 : null);
+import { yf, cached, quotes, fxPerUsd, profileOf, financialCurrency, MIN, HOUR } from "./yahoo.js";
+import { num, div, ratioPct, daysAgo, isoDate, httpError } from "./util.js";
 
 // Financial statements from Yahoo's fundamentals time series (no crumb needed).
 // type: "annual" | "quarterly" | "trailing" (trailing = last twelve months).
 export function fundamentals(symbol, type) {
   const years = type === "annual" ? 6 : 2;
-  const period1 = new Date(Date.now() - years * 365 * 864e5).toISOString().slice(0, 10);
+  const period1 = daysAgo(years * 365);
   return cached(`fts:${symbol}:${type}`, 6 * HOUR, async () => {
     const rows = await yf.fundamentalsTimeSeries(symbol, { period1, type, module: "all" }, { validateResult: false });
     return rows
       .filter((r) => r.date)
       .map((r) => {
-        const d = typeof r.date === "number" ? new Date(r.date * 1000) : new Date(r.date);
-        return { ...r, date: d.toISOString().slice(0, 10) };
+        return { ...r, date: isoDate(typeof r.date === "number" ? r.date * 1000 : r.date) };
       })
       .sort((a, b) => a.date.localeCompare(b.date));
   });
@@ -44,7 +41,7 @@ function beta(stock, index) {
 
 // Beta like Yahoo: 5 years of monthly returns against the S&P 500.
 export function betaOf(symbol) {
-  const start = new Date(Date.now() - 5 * 365 * 864e5).toISOString().slice(0, 10);
+  const start = daysAgo(5 * 365);
   return cached(`beta:${symbol}:${start.slice(0, 7)}`, 12 * HOUR, async () => {
     const [closes, index] = await Promise.all([monthlyCloses(symbol, start), monthlyCloses("^GSPC", start)]);
     return beta(closes, index);
@@ -55,7 +52,7 @@ export function betaOf(symbol) {
 // computed from statements so it works without Yahoo's crumb-protected APIs.
 export function companySnapshot(symbol) {
   symbol = symbol.toUpperCase();
-  return cached(`snap:${symbol}`, 30 * 60_000, async () => {
+  return cached(`snap:${symbol}`, 30 * MIN, async () => {
     const [[quote], profile, ttmRows, quarterly, betaValue, finCur] = await Promise.all([
       quotes([symbol]),
       profileOf(symbol).catch(() => ({})),
@@ -64,11 +61,7 @@ export function companySnapshot(symbol) {
       betaOf(symbol),
       financialCurrency(symbol),
     ]);
-    if (!quote) {
-      const err = new Error(`No se encontró el símbolo ${symbol}`);
-      err.status = 404;
-      throw err;
-    }
+    if (!quote) throw httpError(404, `No se encontró el símbolo ${symbol}`);
 
     const price = quote.regularMarketPrice;
     const ttm = ttmRows.at(-1) ?? {};
@@ -118,15 +111,14 @@ export function companySnapshot(symbol) {
       financialCurrency: statementCur,
       metrics: {
         pe: eps && eps > 0 ? price / eps : null,
-        forwardPe: null,
         pb: div(marketCap, equity),
         evToEbitda: div(ev, conv(ttm.EBITDA ?? ttm.normalizedEBITDA)),
         evToRevenue: div(ev, revenue),
-        roe: equity > 0 ? pct(netIncome, equity) : null,
-        roa: pct(netIncome, conv(bs.totalAssets)),
-        grossMargin: pct(conv(ttm.grossProfit), revenue),
-        operatingMargin: pct(conv(ttm.operatingIncome ?? ttm.EBIT), revenue),
-        profitMargin: pct(netIncome, revenue),
+        roe: equity > 0 ? ratioPct(netIncome, equity) : null,
+        roa: ratioPct(netIncome, conv(bs.totalAssets)),
+        grossMargin: ratioPct(conv(ttm.grossProfit), revenue),
+        operatingMargin: ratioPct(conv(ttm.operatingIncome ?? ttm.EBIT), revenue),
+        profitMargin: ratioPct(netIncome, revenue),
         revenueGrowth: growth("totalRevenue"),
         earningsGrowth: growth("netIncome"),
         debtToEquity: equity > 0 ? div(totalDebt, equity) : null,
@@ -140,7 +132,8 @@ export function companySnapshot(symbol) {
 }
 
 function monthlyCloses(symbol, period1) {
-  return cached(`monthly:${symbol}:${period1.slice(0, 7)}`, 12 * HOUR, async () => {    const c = await yf.chart(symbol, { period1, interval: "1mo" }, { validateResult: false });
+  return cached(`monthly:${symbol}:${period1.slice(0, 7)}`, 12 * HOUR, async () => {
+    const c = await yf.chart(symbol, { period1, interval: "1mo" }, { validateResult: false });
     return c.quotes
       .filter((q) => q.close != null)
       .map((q) => ({ date: new Date(q.date).toISOString().slice(0, 7), close: q.adjclose ?? q.close }));

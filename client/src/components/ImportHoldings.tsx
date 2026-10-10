@@ -14,10 +14,10 @@ function parseNumber(raw: string) {
   return Number(normalized)
 }
 
-export interface ParsedRow { symbol: string; shares: number; avgCost: number }
+interface ParsedRow { symbol: string; shares: number; avgCost: number }
 
 // One holding per line: TICKER UNITS AVG_COST (separated by spaces, tabs or ";").
-export function parseHoldings(text: string): { rows: ParsedRow[]; errors: string[] } {
+function parseHoldings(text: string): { rows: ParsedRow[]; errors: string[] } {
   const rows: ParsedRow[] = []
   const errors: string[] = []
   for (const line of text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {

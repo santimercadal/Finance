@@ -1,12 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getAppKey, useApi, type Reports } from '../api'
-import { compact } from '../format'
-
-const quarterLabel = (date: string) => {
-  const d = new Date(date)
-  return `T${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`
-}
+import { compact, formatDate, quarterLabel } from '../format'
 
 function saveBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob)
@@ -60,7 +55,7 @@ export default function ReportsPanel({ symbol }: { symbol: string }) {
         <div className="card-head">
           <div>
             <h2>Informe trimestral</h2>
-            {data.nextEarnings && <div className="small muted">Próxima presentación de resultados: {new Date(data.nextEarnings).toLocaleDateString('es', { dateStyle: 'long' })}</div>}
+            {data.nextEarnings && <div className="small muted">Próxima presentación de resultados: {formatDate(data.nextEarnings, 'long')}</div>}
           </div>
         </div>
         <div className="report-actions">
@@ -68,7 +63,7 @@ export default function ReportsPanel({ symbol }: { symbol: string }) {
             <div>
               <b>Informe oficial de la empresa</b>
               <div className="small muted">
-                {latestQ ? `${latestQ.label} presentado el ${new Date(latestQ.date).toLocaleDateString('es', { dateStyle: 'medium' })} ante la SEC.` : 'No hay un informe trimestral presentado ante la SEC para este activo.'}
+                {latestQ ? `${latestQ.label} presentado el ${formatDate(latestQ.date)} ante la SEC.` : 'No hay un informe trimestral presentado ante la SEC para este activo.'}
               </div>
             </div>
             {latestQ?.documentUrl && (
@@ -123,7 +118,7 @@ export default function ReportsPanel({ symbol }: { symbol: string }) {
               <div key={`${f.type}-${f.date}-${f.documentUrl}`} className="filing">
                 <div>
                   <span className="chip">{f.type}</span> <b>{f.label}</b>
-                  <div className="small muted">{new Date(f.date).toLocaleDateString('es', { dateStyle: 'medium' })} · {f.title}</div>
+                  <div className="small muted">{formatDate(f.date)} · {f.title}</div>
                 </div>
                 <div className="filing-actions">
                   {f.viewUrl && <a className="btn ghost" href={f.viewUrl} target="_blank" rel="noreferrer">Ver</a>}

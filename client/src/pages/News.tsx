@@ -1,11 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useApi, type AnalystView, type NewsItem, type Portfolio } from '../api'
+import { ratingLabel } from '../format'
 import NewsList from '../components/NewsList'
 import AnalystCard from '../components/AnalystCard'
-
-const RATING: Record<string, [string, string]> = {
-  BUY: ['Comprar', 'up'], STRONG_BUY: ['Compra fuerte', 'up'], HOLD: ['Mantener', 'mid'], SELL: ['Vender', 'down'], STRONG_SELL: ['Venta fuerte', 'down'],
-}
+import DailyDigest from '../components/DailyDigest'
 
 // Pros and cons of every holding with analyst coverage; one expandable row each.
 function AnalystsSection({ filter, portfolio }: { filter: string; portfolio: Portfolio | null }) {
@@ -28,7 +26,7 @@ function AnalystsSection({ filter, portfolio }: { filter: string; portfolio: Por
       {data && items.length === 0 && <div className="empty">No hay cobertura de analistas para {filter === 'todas' || filter === 'portafolio' ? 'tus posiciones' : filter}.</div>}
       <div className="analyst-list">
         {items.map((a) => {
-          const rating = a.rating ? RATING[a.rating.toUpperCase()] : null
+          const rating = ratingLabel(a.rating)
           return (
             <details key={a.symbol} open={items.length === 1}>
               <summary>
@@ -51,7 +49,6 @@ function AnalystsSection({ filter, portfolio }: { filter: string; portfolio: Por
 export default function NewsPage() {
   const portfolio = useApi<Portfolio>('/portfolio')
   const news = useApi<NewsItem[]>('/news?limit=60', 10 * 60_000)
-  const digest = useApi<{ digest: string | null; ai: boolean }>('/news/digest')
   const [filter, setFilter] = useState<string>('todas')
 
   const symbols = useMemo(() => portfolio.data?.holdings.map((h) => h.symbol) ?? [], [portfolio.data])
@@ -75,16 +72,7 @@ export default function NewsPage() {
             ))}
           </div>
         </div>
-        {digest.data?.digest ? (
-          <div>
-            <h3 style={{ marginBottom: 6 }}>✨ Resumen del día</h3>
-            <div className="digest">{digest.data.digest}</div>
-          </div>
-        ) : digest.data && !digest.data.ai ? (
-          <div className="note">
-            Tip: configura <code>GROQ_API_KEY</code> (gratis en console.groq.com) para obtener un resumen del día y resúmenes con IA en español.
-          </div>
-        ) : null}
+        <DailyDigest setupTip />
       </section>
       <AnalystsSection filter={filter} portfolio={portfolio.data} />
       <section className="card">

@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Area, AreaChart, Line, ResponsiveContainer, Tooltip, YAxis } from 'recharts'
 import { api, useApi, type Holding, type NewsItem, type Portfolio, type PortfolioHistory } from '../api'
-import { compact, money, num, pct, signedMoney, tone } from '../format'
+import { compact, formatDate, money, num, pct, signedMoney, tone } from '../format'
 import MarketStrip from '../components/MarketStrip'
 import NewsList from '../components/NewsList'
 import ChartTip from '../components/ChartTip'
 import SymbolSearch from '../components/SymbolSearch'
 import ImportHoldings from '../components/ImportHoldings'
+import DailyDigest from '../components/DailyDigest'
 import MetricStat from '../components/MetricStat'
 
 const RANGES = { '1M': 30, '3M': 91, '6M': 182, '1A': 365 } as const
@@ -81,8 +82,10 @@ function Hero({ p }: { p: Portfolio | null }) {
   const { data, error } = useApi<PortfolioHistory>('/portfolio/history')
   const [range, setRange] = useState<Range>('6M')
   const points = useMemo(() => {
-    if (!data) return []
-    const from = new Date(Date.now() - RANGES[range] * 864e5).toISOString().slice(0, 10)
+    const last = data?.points.at(-1)
+    if (!data || !last) return []
+    // Window counted back from the latest data point.
+    const from = new Date(new Date(last.date).getTime() - RANGES[range] * 864e5).toISOString().slice(0, 10)
     const pts = data.points.filter((pt) => pt.date >= from)
     // Rebase the benchmark to the portfolio value at the start of the visible range.
     const b0 = pts[0]?.benchmark
@@ -130,7 +133,7 @@ function Hero({ p }: { p: Portfolio | null }) {
               </defs>
               <YAxis hide domain={['auto', 'auto']} />
               <Tooltip content={<ChartTip format={(v) => (document.documentElement.classList.contains('privacy') ? '••••' : money(v))}
-                labelFormat={(d) => new Date(d).toLocaleDateString('es', { dateStyle: 'medium' })} />} />
+                labelFormat={formatDate} />} />
               <Area type="monotone" dataKey="value" name="Portafolio" stroke={lineColor} strokeWidth={2.5} fill="url(#pf)" dot={false} />
               <Line type="monotone" dataKey="benchmark" name="S&P 500" stroke="var(--primary-soft)" strokeOpacity={0.6} strokeWidth={1.25} strokeDasharray="4 3" dot={false} />
             </AreaChart>
@@ -408,28 +411,15 @@ function Sparkline({ values }: { values?: number[] }) {
   )
 }
 
-function NewsDigest() {
-  const { data } = useApi<{ digest: string | null; ai: boolean }>('/news/digest')
-  if (!data?.digest) return null
-  return (
-    <div style={{ marginBottom: 12 }}>
-      <h3 style={{ marginBottom: 6 }}>✨ Resumen del día</h3>
-      <div className="digest">{data.digest}</div>
-    </div>
-  )
-}
-
 export default function Dashboard() {
   const portfolio = useApi<Portfolio>('/portfolio', 60_000)
   const news = useApi<NewsItem[]>('/news?limit=8', 10 * 60_000)
   const [privacy, togglePrivacy] = usePrivacy()
   const [panel, setPanel] = useState<Panel>(null)
-  const [updated, setUpdated] = useState<Date | null>(null)
-  useEffect(() => { if (portfolio.data) setUpdated(new Date()) }, [portfolio.data])
 
   return (
     <main className="dashboard">
-      <StatusBar updated={updated} privacy={privacy} togglePrivacy={togglePrivacy} onRefresh={portfolio.reload} />
+      <StatusBar updated={portfolio.updatedAt} privacy={privacy} togglePrivacy={togglePrivacy} onRefresh={portfolio.reload} />
       {portfolio.error && <div className="error">No se pudo cargar el portafolio: {portfolio.error}</div>}
       <div className="dash-grid">
         <div className="dash-main">
@@ -453,7 +443,7 @@ export default function Dashboard() {
       <section className="card">
         <div className="card-head"><h2>Noticias de tu portafolio</h2><Link to="/noticias" className="small">Ver todas →</Link></div>
         <div className="news-layout">
-          <NewsDigest />
+          <DailyDigest />
           {news.data ? <NewsList items={news.data} /> : <div className="skeleton" style={{ height: 200 }} />}
         </div>
       </section>

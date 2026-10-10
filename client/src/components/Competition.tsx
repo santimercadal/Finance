@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { PeerComparison } from '../api'
-import { METRICS } from '../metrics'
+import { metricInfo } from '../metrics'
 import { compact, num, pct, scoreClass } from '../format'
 import SymbolSearch from './SymbolSearch'
 
@@ -100,8 +100,8 @@ export default function Competition({ data, loading, error, onAdd }: Props) {
                 <tr key={cat} className="group-row"><td colSpan={4 + peers.length}>{cat}</td></tr>,
                 ...data.metrics.filter((m) => m.category === cat).map((m) => (
                   <tr key={m.key}>
-                    <td title={METRICS[m.key]?.what}>
-                      {METRICS[m.key]?.name ?? m.key}
+                    <td title={metricInfo(m.key)?.what}>
+                      {metricInfo(m.key)?.name ?? m.key}
                       <span className="muted small"> {m.better === 'high' ? '↑' : '↓'}</span>
                     </td>
                     <td className="self-col">{fmtMetric(m.key, m.value)}</td>

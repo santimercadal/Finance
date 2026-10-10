@@ -63,3 +63,11 @@ export async function setJSON(key, value, ttlSeconds) {
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(path.join(DATA_DIR, `${key}.json`), JSON.stringify(value, null, 2));
 }
+
+// Long-lived cache for expensive results (AI answers) that should survive
+// restarts. Only backed by Upstash: local JSON files have no expiry, so in
+// development these are no-ops. Failures never break the caller.
+const durable = storageKind === "upstash";
+export const recall = (key) => (durable ? getJSON(key).catch(() => null) : Promise.resolve(null));
+export const remember = (key, value, ttlSeconds) =>
+  durable ? setJSON(key, value, ttlSeconds).catch(() => {}) : Promise.resolve();

@@ -1,30 +1,17 @@
-import { Link } from 'react-router-dom'
 import type { AnalystView } from '../api'
-import { money } from '../format'
+import { formatDate, money, ratingLabel } from '../format'
 
-const RATING: Record<string, [string, string]> = {
-  BUY: ['Comprar', 'up'],
-  STRONG_BUY: ['Compra fuerte', 'up'],
-  HOLD: ['Mantener', 'mid'],
-  SELL: ['Vender', 'down'],
-  STRONG_SELL: ['Venta fuerte', 'down'],
-}
 const TONE: Record<string, string> = { alcista: 'up', bajista: 'down', neutral: 'mid' }
 
 // Pros and cons from Morningstar's bull/bear case plus the published rating,
 // target and technical outlook. Text is the analysts', not the app's.
-export default function AnalystCard({ a, currency, title }: { a: AnalystView; currency?: string; title?: boolean }) {
-  const rating = a.rating ? RATING[a.rating.toUpperCase()] ?? [a.rating, ''] : null
+export default function AnalystCard({ a, currency }: { a: AnalystView; currency?: string }) {
+  const rating = ratingLabel(a.rating)
   const outlook = a.outlook
     ? ([['Corto', a.outlook.short], ['Mediano', a.outlook.mid], ['Largo', a.outlook.long]] as const).filter(([, o]) => o)
     : []
   return (
     <div className="analyst">
-      {title && (
-        <div className="analyst-head">
-          <Link to={`/accion/${encodeURIComponent(a.symbol)}`} className="sym">{a.symbol}</Link>
-        </div>
-      )}
       <div className="analyst-tags">
         {rating && (
           <span className={`badge ${rating[1]}`} title={a.ratingSource ?? undefined}>
@@ -55,7 +42,7 @@ export default function AnalystCard({ a, currency, title }: { a: AnalystView; cu
         </div>
       )}
       <div className="note">
-        {a.prosConsSource && <>Pros y contras: {a.prosConsSource}{a.prosConsDate ? ` (${new Date(`${a.prosConsDate}T12:00:00`).toLocaleDateString('es', { dateStyle: 'medium' })})` : ''}{!a.translated && ' · en inglés, la traducción está en curso'}. </>}
+        {a.prosConsSource && <>Pros y contras: {a.prosConsSource}{a.prosConsDate ? ` (${formatDate(a.prosConsDate)})` : ''}{!a.translated && ' · en inglés, la traducción está en curso'}. </>}
         {a.ratingSource && <>Calificación: {a.ratingSource}. </>}
         {a.outlook?.source && <>Perspectiva técnica: {a.outlook.source}. </>}
         Vía Yahoo Finance. Es la opinión de los analistas, no una recomendación de la app.
