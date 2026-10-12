@@ -4,19 +4,21 @@ Dashboard personal de inversiones con datos de mercado de Yahoo Finance. Se inst
 
 ## Qué incluye
 
-- **Inicio**: indicadores clave del mercado, KPIs del portafolio (valor, variación del día, ganancia total, mejor/peor, **beta del portafolio**), rendimiento vs. S&P 500, posiciones y, debajo, noticias con resumen.
-- **Posiciones**: se cargan a mano, pegando una lista (`TICKER UNIDADES PRECIO_PROMEDIO`) o con el botón **Sincronizar eToro**.
+- **Inicio (Portafolio)**: indicadores clave del mercado arriba de todo, KPIs del portafolio (valor, variación del día, ganancia total, mejor/peor, **beta del portafolio**), rendimiento vs. S&P 500, **distribución** por activo, tipo y sector, y la lista de posiciones.
+- **Posiciones**: se cargan a mano, pegando una lista (`TICKER UNIDADES PRECIO_PROMEDIO`) o con el botón **Sincronizar eToro**. Antes de eliminar una posición se pide confirmación.
+- **Acciones de otros mercados** (por ejemplo europeas: `MC.PA`, `SAP.DE`): el precio se muestra en su moneda y en USD; los informes de la SEC no aplican si la empresa no reporta ante la SEC.
 - **ETF y cripto** tienen su propia vista: rendimiento total (1M a 5 años), volatilidad, caída máxima, beta, correlación con el S&P 500, ratio de Sharpe, dividendos y, cuando está disponible, costo anual (TER), patrimonio, principales posiciones y sectores.
 - **Análisis de cada acción**:
-  - *Resumen*: precio 12 meses y métricas clave. Toca el nombre de cualquier métrica para ver **qué es y para qué sirve**; las métricas que se leen en relación con otras empresas muestran automáticamente la **mediana de la competencia** y si la empresa está mejor o peor.
+  - *Resumen*: precio 12 meses y métricas clave. Toca el nombre de cualquier métrica para ver **qué es y para qué sirve**; las métricas que se leen en relación con otras empresas muestran automáticamente la **mediana de la competencia** y si la empresa está mejor o peor. Incluye los *pros y contras según analistas*.
+  - *Proyecciones*: precio objetivo de los analistas con su rango, recomendaciones, BPA reportado vs. estimado, estimaciones de consenso por trimestre y año (con ingresos y revisiones), precio implícito al P/E actual y sorpresas de resultados.
   - *Competencia*: comparación contra las principales empresas de la misma industria y un **score 0-100** (valuación, rentabilidad, crecimiento, salud financiera). Se pueden agregar competidores a mano.
-  - *Estructura patrimonial*: Activos = Pasivos + Patrimonio, proporciones y evolución.
+  - *Estructura patrimonial*: Activos = Pasivos + Patrimonio, proporciones y evolución (en bancos, sin la división corriente / no corriente).
   - *Flujo de fondos*: operativo, inversión, financiamiento y flujo libre.
   - *Deuda*: costo de la deuda (Kd), Kd después de impuestos, cobertura de intereses, deuda neta / EBITDA.
   - *Informes*: descarga del **informe trimestral oficial** (10-Q / 6-K ante la SEC), informe resumido en PDF y datos trimestrales en CSV para Excel.
-  - *Pros y contras según analistas* (en el Resumen).
   - *Noticias* del ticker.
-- **Noticias**: feed del portafolio + mercado con resúmenes en español generados con IA gratuita (Groq), si configuras la clave, y **pros y contras de los analistas** para cada posición.
+  - Si falta algún dato contable se muestra un aviso en lugar de una pestaña vacía.
+- **Noticias**: feed del portafolio + mercado con resúmenes en español generados con IA gratuita (Groq), si configuras la clave, resumen del día y **pros y contras de los analistas** para cada posición.
 
 ## Fuentes de datos
 
@@ -27,6 +29,7 @@ Dashboard personal de inversiones con datos de mercado de Yahoo Finance. Se inst
 | Industria, sector y competidores | Yahoo Finance — búsqueda | Competidores = mayores empresas de la misma industria. |
 | Pros y contras de cada empresa | [Morningstar](https://www.morningstar.com) (bull/bear case), vía Yahoo Finance *insights* | Traducidos al español con IA; solo acciones con cobertura. |
 | Calificación y precio objetivo | [Argus Research](https://www.argusresearch.com), vía Yahoo Finance *insights* | |
+| Estimaciones de consenso (BPA, ingresos, precio objetivo) | Yahoo Finance — *quoteSummary*; si no está disponible, [Nasdaq](https://www.nasdaq.com) (API pública) | Nasdaq solo cubre acciones que cotizan en EE.UU. |
 | Perspectiva técnica y valuación relativa | [Trading Central](https://www.tradingcentral.com), vía Yahoo Finance *insights* | Corto, mediano y largo plazo. |
 | Costo, patrimonio y composición de ETF | Yahoo Finance — *quoteSummary* | Yahoo lo bloquea para servidores en la nube: en Render puede no aparecer. |
 | Informes oficiales (10-Q, 10-K, 6-K) | [SEC EDGAR](https://www.sec.gov/edgar) | Solo empresas que reportan ante la SEC. |
@@ -38,6 +41,7 @@ Dashboard personal de inversiones con datos de mercado de Yahoo Finance. Se inst
 - **Beta** de cada activo: 5 años de rendimientos mensuales contra el S&P 500. **Beta del portafolio**: promedio ponderado por el valor de cada posición.
 - **Volatilidad**: desvío estándar anualizado de los rendimientos diarios del último año. **Caída máxima**: mayor caída desde un pico. **Sharpe**: (rendimiento 1 año − tasa libre de riesgo) / volatilidad.
 - **Rendimiento total** de ETF y cripto: con dividendos reinvertidos; 3 y 5 años anualizados.
+- **Precio implícito** (Proyecciones): BPA estimado × P/E actual.
 - Valores en otras monedas se convierten a USD al tipo de cambio actual.
 
 ## Uso local
@@ -51,6 +55,8 @@ npm run dev
 ```
 
 Abre http://localhost:5173. Opcional: copia `server/.env.example` a `server/.env` y completa las variables.
+
+La guía técnica del código (estructura, comandos y detalles a tener en cuenta) está en [CLAUDE.md](CLAUDE.md).
 
 ## Publicar en internet (para usarla desde el teléfono)
 
