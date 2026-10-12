@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, type NewsItem } from '../api'
 import { ago } from '../format'
+import Markdown from './Markdown'
 
 interface Summary {
   summary: string | null
@@ -39,7 +40,7 @@ function NewsRow({ item }: { item: NewsItem }) {
           {summary?.source === 'ai' && <span className="chip" title="Resumen generado con IA">✨ IA</span>}
         </div>
         {summary ? (
-          summary.summary && <div className="summary">{summary.summary}</div>
+          summary.summary && <Markdown className="summary" text={summary.summary} />
         ) : (
           <><div className="skeleton" style={{ width: '95%' }} /><div className="skeleton" style={{ width: '70%' }} /></>
         )}

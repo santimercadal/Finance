@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Area, AreaChart, Line, ResponsiveContainer, Tooltip, YAxis } from 'recharts'
 import { api, useApi, type Holding, type Portfolio, type PortfolioHistory } from '../api'
@@ -8,6 +8,9 @@ import ChartTip from '../components/ChartTip'
 import SymbolSearch from '../components/SymbolSearch'
 import ImportHoldings from '../components/ImportHoldings'
 import MetricStat from '../components/MetricStat'
+import ConfirmDialog from '../components/ConfirmDialog'
+import Toast, { type ToastMsg } from '../components/Toast'
+import AllocationChart from '../components/AllocationChart'
 
 const RANGES = { '1M': 30, '3M': 91, '6M': 182, '1A': 365 } as const
 type Range = keyof typeof RANGES
@@ -170,17 +173,26 @@ interface SyncResult { count: number; skipped: string[]; shorts: number; cash: n
 function QuickActions({ panel, setPanel }: { panel: Panel; setPanel: (p: Panel) => void }) {
   const status = useApi<SyncStatus>('/portfolio/sync/etoro')
   const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState<{ text: string; error?: boolean } | null>(null)
-  const [done] = useState(() => sessionStorageTake('etoro-sync-msg'))
+  const [asking, setAsking] = useState(false)
+  // Result of a sync that finished right before the page reload.
+  const [toast, setToast] = useState<ToastMsg | null>(() => {
+    const done = sessionStorageTake('etoro-sync-msg')
+    return done ? { text: done } : null
+  })
+  const closeToast = useCallback(() => setToast(null), [])
 
-  const sync = async () => {
+  const askSync = () => {
     if (!status.data?.enabled) {
-      setMsg({ text: 'Falta configurar las claves de eToro en el servidor (ETORO_API_KEY y ETORO_USER_KEY). Ver README.', error: true })
+      setToast({ text: 'Falta configurar las claves de eToro en el servidor (ETORO_API_KEY y ETORO_USER_KEY). Ver README.', error: true })
       return
     }
-    if (!confirm('¿Reemplazar el portafolio con tus posiciones abiertas de eToro?')) return
+    setAsking(true)
+  }
+
+  const sync = async () => {
+    setAsking(false)
     setBusy(true)
-    setMsg(null)
+    setToast(null)
     try {
       const r = await api<SyncResult>('/portfolio/sync/etoro', { method: 'POST' })
       const extra = [
@@ -191,7 +203,7 @@ function QuickActions({ panel, setPanel }: { panel: Panel; setPanel: (p: Panel) 
       // Reload so the KPIs and the performance chart reflect the new holdings.
       window.location.reload()
     } catch (e) {
-      setMsg({ text: (e as Error).message, error: true })
+      setToast({ text: `No se pudo sincronizar con eToro: ${(e as Error).message}`, error: true })
       setBusy(false)
     }
   }
@@ -201,9 +213,9 @@ function QuickActions({ panel, setPanel }: { panel: Panel; setPanel: (p: Panel) 
   return (
     <section>
       <div className="quick-actions">
-        <button className="qa primary" onClick={sync} disabled={busy}
+        <button className="qa primary" onClick={askSync} disabled={busy} aria-busy={busy}
           title={last ? `Última sincronización: ${new Date(last.at).toLocaleString('es')}` : 'Trae tus posiciones abiertas de eToro'}>
-          <span className="qa-icon">{icon(ICONS.sync, 20)}</span>
+          <span className={`qa-icon ${busy ? 'spin' : ''}`}>{icon(ICONS.sync, 20)}</span>
           {busy ? 'Sincronizando…' : 'Sincronizar eToro'}
         </button>
         <button className={`qa ${panel === 'add' ? 'on' : ''}`} onClick={() => toggle('add')} aria-expanded={panel === 'add'}>
@@ -215,10 +227,15 @@ function QuickActions({ panel, setPanel }: { panel: Panel; setPanel: (p: Panel) 
           Importar lista
         </button>
       </div>
-      {(msg || done) && <div className={`sync-msg small ${msg?.error ? 'error' : 'muted'}`}>{msg?.text ?? done}</div>}
-      {!msg && !done && last && (
+      {last && (
         <div className="sync-msg small muted">Última sincronización con eToro: {new Date(last.at).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' })}</div>
       )}
+      {asking && (
+        <ConfirmDialog title="Sincronizar con eToro" confirmLabel="Sincronizar"
+          message="Se reemplazará el portafolio con tus posiciones abiertas de eToro."
+          onConfirm={sync} onCancel={() => setAsking(false)} />
+      )}
+      <Toast msg={toast} onClose={closeToast} />
     </section>
   )
 }
@@ -254,8 +271,12 @@ function AddForm({ reload, onClose }: { reload: () => void; onClose: () => void 
       <form className="add-form" onSubmit={add}>
         <SymbolSearch className="search" placeholder="Símbolo" onSelect={(r) => setSymbol(r.symbol)} />
         {symbol && <span className="chip" style={{ alignSelf: 'center' }}>{symbol}</span>}
-        <input className="input" type="number" step="any" min="0" placeholder="Cantidad" value={shares} onChange={(e) => setShares(e.target.value)} required />
-        <input className="input" type="number" step="any" min="0" placeholder="Costo promedio" value={cost} onChange={(e) => setCost(e.target.value)} required />
+        <label className="field"><span>Cantidad</span>
+          <input className="input" type="number" step="any" min="0" placeholder="0" value={shares} onChange={(e) => setShares(e.target.value)} required />
+        </label>
+        <label className="field"><span>Costo promedio</span>
+          <input className="input" type="number" step="any" min="0" placeholder="0,00" value={cost} onChange={(e) => setCost(e.target.value)} required />
+        </label>
         <button className="btn" disabled={busy || !symbol}>{busy ? 'Agregando…' : 'Agregar / actualizar'}</button>
       </form>
       {err && <div className="error" style={{ marginTop: 6 }}>{err}</div>}
@@ -307,10 +328,17 @@ function Positions({ p, reload }: { p: Portfolio; reload: () => void }) {
   const navigate = useNavigate()
   const open = (h: Holding) => navigate(`/accion/${encodeURIComponent(h.symbol)}`)
 
+  const [removing, setRemoving] = useState<string | null>(null)
+  const [error, setError] = useState<ToastMsg | null>(null)
+  const closeError = useCallback(() => setError(null), [])
   const remove = async (sym: string) => {
-    if (!confirm(`¿Quitar ${sym} del portafolio?`)) return
-    await api(`/portfolio/${encodeURIComponent(sym)}`, { method: 'DELETE' })
-    reload()
+    setRemoving(null)
+    try {
+      await api(`/portfolio/${encodeURIComponent(sym)}`, { method: 'DELETE' })
+      reload()
+    } catch (e) {
+      setError({ text: `No se pudo eliminar ${sym}: ${(e as Error).message}`, error: true })
+    }
   }
 
   return (
@@ -340,7 +368,10 @@ function Positions({ p, reload }: { p: Portfolio; reload: () => void }) {
               <div className="holding-right">
                 <div className="num holding-value sensitive">{money(h.valueUsd)}</div>
                 <div className="holding-price">
-                  <span className="num muted">{money(h.price, h.currency)}</span>
+                  <span className="num muted">
+                    {money(h.price, h.currency)}
+                    {h.currency !== 'USD' && h.price != null && h.fx ? <> · ({money(h.price / h.fx)})</> : null}
+                  </span>
                   <span className={`badge ${tone(h.dayChangePct)}`}>{pct(h.dayChangePct)}</span>
                 </div>
               </div>
@@ -349,12 +380,17 @@ function Positions({ p, reload }: { p: Portfolio; reload: () => void }) {
               <span className="num muted"><span className="sensitive">{num(h.shares, h.shares % 1 ? 4 : 0)}</span> × {money(h.avgCost, h.currency)}</span>
               <span className={`num ${tone(h.pnlUsd)}`}><span className="sensitive">{signedMoney(h.pnlUsd)}</span> ({pct(h.pnlPct)})</span>
               <button className="icon-btn" aria-label={`Quitar ${h.symbol}`} title="Quitar"
-                onClick={(e) => { e.stopPropagation(); remove(h.symbol) }}>{icon(ICONS.x, 14)}</button>
+                onClick={(e) => { e.stopPropagation(); setRemoving(h.symbol) }}>{icon(ICONS.x, 14)}</button>
             </div>
             <div className="weight-track"><div className={(h.pnlUsd ?? 0) < 0 ? 'neg' : ''} style={{ width: `${Math.min(h.weight, 100)}%` }} /></div>
           </div>
         ))}
       </div>
+      {removing && (
+        <ConfirmDialog title={`Eliminar ${removing}`} message="¿Seguro que deseas eliminar esta posición?" confirmLabel="Eliminar" danger
+          onConfirm={() => remove(removing)} onCancel={() => setRemoving(null)} />
+      )}
+      <Toast msg={error} onClose={closeError} />
     </section>
   )
 }
@@ -431,6 +467,7 @@ export default function Dashboard() {
             </section>
           )}
           {portfolio.data && <KeyMetrics p={portfolio.data} />}
+          {portfolio.data && <AllocationChart holdings={portfolio.data.holdings} />}
         </div>
         <div className="dash-side">
           {portfolio.data && <Positions p={portfolio.data} reload={portfolio.reload} />}

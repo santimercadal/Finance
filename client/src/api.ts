@@ -16,6 +16,9 @@ export interface Holding {
   name: string
   currency: string
   type: string | null
+  sector: string | null
+  /** Units of `currency` per 1 USD. */
+  fx: number
   beta: number | null
   price: number | null
   dayChangePct: number | null
@@ -273,6 +276,7 @@ export interface Reports {
   currency: string
   nextEarnings: string | null
   filings: { date: string; type: string; label: string; title: string; documentUrl: string | null; viewUrl: string | null }[]
+  sec?: { available: boolean; reason: string | null }
   quarterly: { dates: string[]; rows: { label: string; key: string; values: (number | null)[] }[] }
 }
 

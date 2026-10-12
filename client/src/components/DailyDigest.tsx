@@ -1,4 +1,5 @@
 import { useApi } from '../api'
+import Markdown from './Markdown'
 
 interface Digest { digest: string | null; ai: boolean }
 
@@ -10,7 +11,7 @@ export default function DailyDigest({ setupTip = false }: { setupTip?: boolean }
     return (
       <div className="digest-block">
         <h3>✨ Resumen del día</h3>
-        <div className="digest">{data.digest}</div>
+        <Markdown className="digest" text={data.digest} />
       </div>
     )
   }

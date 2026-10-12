@@ -24,6 +24,17 @@ export function compact(v: number | null | undefined, currency?: string) {
   return currency ? `${out} ${currency}` : out
 }
 
+// Spelled-out scale for headline amounts, so "5,0 B" can't be read as five
+// (English) billions: 4,98 billones (= 4,98 trillion en inglés) / 105,7 mil millones.
+export function bigAmount(v: number | null | undefined, currency?: string) {
+  if (!isNum(v)) return '—'
+  const abs = Math.abs(v)
+  const [div, words, en] =
+    abs >= 1e12 ? [1e12, 'billones', 'trillion'] : abs >= 1e9 ? [1e9, 'mil millones', 'billion'] : abs >= 1e6 ? [1e6, 'millones', 'million'] : [1, '', '']
+  const n = num(v / div, div > 1 ? 2 : 0)
+  return `${n}${words ? ` ${words}` : ''}${currency ? ` ${currency}` : ''}${en ? ` (${n} ${en} en inglés)` : ''}`
+}
+
 export function pct(v: number | null | undefined, digits = 2, signed = true) {
   if (!isNum(v)) return '—'
   const s = num(v, digits)

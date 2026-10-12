@@ -29,11 +29,18 @@ function cikFor(symbol) {
   }).then((map) => map.get(symbol.toUpperCase()) ?? map.get(symbol.toUpperCase().replace(".", "-")) ?? null);
 }
 
-// Latest periodic reports and material events filed with the SEC.
+// Yahoo suffixes of non-US listings (BNP.PA, SAN.MC, SAP.DE…). Share classes
+// such as BRK.B use other letters, so they still go to the SEC lookup.
+const FOREIGN_SUFFIX = /\.(PA|MC|DE|F|L|AS|BR|MI|LS|SW|ST|OL|CO|HE|VI|IR|TO|V|AX|HK|T|SS|SZ|KS|NS|BO|SA|MX|BA|SN|JO|TW|SI|NZ|TA)$/i;
+const NOT_SEC = "Empresa no sujeta a regulación SEC de EE.UU.";
+
+// Latest periodic reports and material events filed with the SEC. Companies
+// without a CIK (most non-US listings) get `available: false` instead of an error.
 export async function secFilings(symbol) {
+  if (FOREIGN_SUFFIX.test(symbol)) return { available: false, reason: NOT_SEC, filings: [] };
   const cik = await cikFor(symbol);
-  if (!cik) return [];
-  return cached(`sec:filings:${cik}`, 6 * HOUR, async () => {
+  if (!cik) return { available: false, reason: NOT_SEC, filings: [] };
+  const filings = await cached(`sec:filings:${cik}`, 6 * HOUR, async () => {
     const data = await secJson(`https://data.sec.gov/submissions/CIK${String(cik).padStart(10, "0")}.json`);
     const r = data.filings?.recent ?? {};
     const out = [];
@@ -53,6 +60,7 @@ export async function secFilings(symbol) {
     }
     return out;
   });
+  return { available: true, reason: null, filings };
 }
 
 // Download proxy only accepts documents from the SEC archive.

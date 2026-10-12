@@ -1,4 +1,4 @@
-import { quotes, dailyCloses, fxPerUsd } from "./yahoo.js";
+import { quotes, dailyCloses, fxPerUsd, profileOf } from "./yahoo.js";
 import { getJSON, setJSON } from "./storage.js";
 import { betaOf } from "./company.js";
 import { changePct, daysAgo } from "./util.js";
@@ -49,10 +49,11 @@ export async function portfolioSnapshot() {
   const rows = await Promise.all(
     holdings.map(async (h) => {
       const q = bySym[h.symbol] ?? {};
-      const [fx, closes, beta] = await Promise.all([
+      const [fx, closes, beta, profile] = await Promise.all([
         fxPerUsd(q.currency),
         dailyCloses(h.symbol, sparkStart).catch(() => []),
         betaOf(h.symbol),
+        profileOf(h.symbol).catch(() => ({})),
       ]);
       const price = q.regularMarketPrice ?? null;
       const prev = q.regularMarketPreviousClose ?? price;
@@ -63,6 +64,9 @@ export async function portfolioSnapshot() {
         name: q.shortName || q.longName || h.symbol,
         currency: q.currency || "USD",
         type: q.quoteType ?? null,
+        sector: profile.sectorDisp ?? profile.sector ?? null,
+        // Units of the holding's currency per 1 USD (1 for USD holdings).
+        fx,
         beta,
         price,
         dayChangePct: q.regularMarketChangePercent ?? null,

@@ -63,7 +63,7 @@ export default function ReportsPanel({ symbol }: { symbol: string }) {
             <div>
               <b>Informe oficial de la empresa</b>
               <div className="small muted">
-                {latestQ ? `${latestQ.label} presentado el ${formatDate(latestQ.date)} ante la SEC.` : 'No hay un informe trimestral presentado ante la SEC para este activo.'}
+                {latestQ ? `${latestQ.label} presentado el ${formatDate(latestQ.date)} ante la SEC.` : (data.sec?.available === false ? `${data.sec.reason ?? 'Sin informes ante la SEC.'} Consulta el sitio de inversores de la empresa.` :'No hay un informe trimestral presentado ante la SEC para este activo.')}
               </div>
             </div>
             {latestQ?.documentUrl && (
@@ -133,7 +133,13 @@ export default function ReportsPanel({ symbol }: { symbol: string }) {
             ))}
           </div>
         ) : (
-          <div className="empty">Esta empresa no tiene presentaciones ante la SEC disponibles (habitual en acciones que solo cotizan fuera de EE.UU.).</div>
+          <div className="info-banner" role="status">
+            <span className="info-dot" aria-hidden>i</span>
+            <div>
+              <b>{data.sec?.reason ?? 'Sin presentaciones ante la SEC'}</b>
+              <div className="small muted">Las empresas que solo cotizan fuera de EE.UU. publican sus informes (bajo IFRS) en el sitio de relación con inversores y en el regulador de su país. Los datos trimestrales de arriba siguen disponibles cuando Yahoo Finance los publica.</div>
+            </div>
+          </div>
         )}
       </section>
     </div>

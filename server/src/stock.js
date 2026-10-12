@@ -123,8 +123,8 @@ const QUARTERLY_ITEMS = [
 
 export async function stockReports(symbol) {
   symbol = symbol.toUpperCase();
-  const [filings, quarterly, snap, extra] = await Promise.all([
-    secFilings(symbol).catch(() => []),
+  const [sec, quarterly, snap, extra] = await Promise.all([
+    secFilings(symbol).catch(() => ({ available: false, reason: "No se pudo consultar la SEC en este momento.", filings: [] })),
     fundamentals(symbol, "quarterly").catch(() => []),
     companySnapshot(symbol),
     optionalSummary(symbol, ["calendarEvents"]),
@@ -136,7 +136,8 @@ export async function stockReports(symbol) {
     name: snap.profile.name,
     currency: snap.financialCurrency,
     nextEarnings: earningsDate ? isoDate(earningsDate) : null,
-    filings,
+    filings: sec.filings,
+    sec: { available: sec.available, reason: sec.reason },
     quarterly: {
       dates: quarters.map((q) => q.date),
       rows: QUARTERLY_ITEMS.map(([label, key]) => ({

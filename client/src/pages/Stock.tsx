@@ -5,7 +5,7 @@ import {
   ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { useApi, type AnalystView, type BalanceRow, type NewsItem, type PeerComparison, type StockDetail } from '../api'
-import { compact, formatDate, money, monthLabel, num, pct, scoreClass, tone, year } from '../format'
+import { bigAmount, compact, formatDate, money, monthLabel, num, pct, scoreClass, tone, year } from '../format'
 import ChartTip from '../components/ChartTip'
 import NewsList from '../components/NewsList'
 import MetricStat from '../components/MetricStat'
@@ -47,12 +47,44 @@ function RatioBar({ label, parts }: { label: string; parts: [string, number | nu
   )
 }
 
+// Friendly notice instead of a blank tab when a statement is missing, which is
+// common for companies outside the US (IFRS filers have fewer items on Yahoo).
+function NoData({ d, what }: { d: StockDetail; what: string }) {
+  const foreign = d.quote.currency !== 'USD' || (d.profile.country != null && d.profile.country !== 'United States')
+  return (
+    <div className="card info-banner" role="status">
+      <span className="info-dot" aria-hidden>i</span>
+      <div>
+        <b>{what} no disponible para {d.symbol}</b>
+        <div className="small muted">
+          {foreign
+            ? 'Las empresas fuera de EE.UU. reportan bajo normas IFRS y no presentan informes ante la SEC; Yahoo Finance publica menos partidas de sus estados contables.'
+            : 'Yahoo Finance no publica estas partidas para este activo.'}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const axis = { tick: { fill: 'var(--muted)', fontSize: 11 }, tickLine: false }
 
 function Overview({ d }: { d: StockDetail }) {
   const first = d.chart[0]?.close
   const last = d.chart.at(-1)?.close
   const up = first && last ? last >= first : true
+  // Numeric time axis bounded by the first and last real quote, so the chart never runs past today.
+  const series = useMemo(() => d.chart.map((p) => ({ ...p, t: new Date(`${p.date}T12:00:00`).getTime() })), [d.chart])
+  // One tick on the 1st of every other month inside the data range.
+  const ticks = useMemo(() => {
+    const first = series[0]?.t
+    const end = series.at(-1)?.t
+    if (first == null || end == null) return undefined
+    const out: number[] = []
+    const m = new Date(first)
+    m.setDate(1); m.setHours(12, 0, 0, 0); m.setMonth(m.getMonth() + 1)
+    for (; m.getTime() <= end; m.setMonth(m.getMonth() + 2)) out.push(m.getTime())
+    return out
+  }, [series])
   return (
     <div style={{ display: 'grid', gap: 20 }}>
       <section className="card">
@@ -62,7 +94,7 @@ function Overview({ d }: { d: StockDetail }) {
         </div>
         <div style={{ height: 260 }}>
           <ResponsiveContainer>
-            <AreaChart data={d.chart} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+            <AreaChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="px" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="var(--s1)" stopOpacity={0.25} />
@@ -70,10 +102,10 @@ function Overview({ d }: { d: StockDetail }) {
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="var(--grid)" vertical={false} />
-              <XAxis dataKey="date" {...axis} axisLine={{ stroke: 'var(--axis)' }} minTickGap={50}
-                tickFormatter={monthLabel} />
+              <XAxis dataKey="t" type="number" scale="time" domain={['dataMin', 'dataMax']} ticks={ticks} {...axis} axisLine={{ stroke: 'var(--axis)' }}
+                minTickGap={50} tickFormatter={(t: number) => monthLabel(new Date(t).toISOString())} />
               <YAxis {...axis} axisLine={false} width={56} domain={['auto', 'auto']} tickFormatter={(v: number) => num(v, 0)} />
-              <Tooltip content={<ChartTip format={(v) => money(v, d.quote.currency)} labelFormat={formatDate} />} />
+              <Tooltip content={<ChartTip format={(v) => money(v, d.quote.currency)} labelFormat={(t) => formatDate(new Date(Number(t)).toISOString())} />} />
               <Area type="monotone" dataKey="close" name="Cierre" stroke="var(--s1)" strokeWidth={2} fill="url(#px)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
@@ -104,7 +136,7 @@ function EquityOverview({ d }: { d: StockDetail }) {
       <section className="card">
         <div className="card-head"><h2>Indicadores clave</h2></div>
         <div className="stats">
-          <MetricStat id="marketCap" value={compact(d.quote.marketCap, d.quote.currency)} />
+          <MetricStat id="marketCap" value={compact(d.quote.marketCap, d.quote.currency)} hint={d.quote.marketCap ? bigAmount(d.quote.marketCap) : undefined} />
           <MetricStat id="pe" value={num(n('pe'), 1)} raw={n('pe')} format={(v) => num(v, 1)} />
           <MetricStat id="pb" value={num(n('pb'), 2)} raw={n('pb')} format={(v) => num(v, 2)} />
           <MetricStat id="evToEbitda" value={num(n('evToEbitda'), 1)} raw={n('evToEbitda')} format={(v) => num(v, 1)} />
@@ -144,24 +176,32 @@ function EquationBar({ b, cur }: { b: BalanceRow; cur: string }) {
   const h = (v: number | null) => `${Math.max(((v ?? 0) / total) * 100, 0)}%`
   const share = (v: number | null) => pct(v != null ? (v / total) * 100 : null, 1, false)
   const negEquity = (b.equity ?? 0) < 0
+  // Banks and insurers (common under IFRS) don't split current / non-current:
+  // show the total as a single block instead of empty ones.
+  const unclassified = b.currentAssets == null && b.nonCurrentAssets == null
+  const block = (label: string, v: number | null, color: string, opacity = 1) => (
+    <div className="block" style={{ background: `var(${color})`, opacity, height: h(v) }}>
+      <span>{label}</span><b>{compact(v)}</b><span>{share(v)}</span>
+    </div>
+  )
   return (
     <>
       <div className="equation" role="img" aria-label={`Activos ${compact(total)}; pasivos ${share(b.totalLiabilities)}; patrimonio ${share(b.equity)}`}>
         <div className="col">
-          <div className="block" style={{ background: 'var(--s1)', height: h(b.currentAssets) }}>
-            <span>Activo corriente</span><b>{compact(b.currentAssets)}</b><span>{share(b.currentAssets)}</span>
-          </div>
-          <div className="block" style={{ background: 'var(--s1)', opacity: 0.75, height: h(b.nonCurrentAssets) }}>
-            <span>Activo no corriente</span><b>{compact(b.nonCurrentAssets)}</b><span>{share(b.nonCurrentAssets)}</span>
-          </div>
+          {unclassified ? block('Activo total', b.totalAssets, '--s1') : (
+            <>
+              {block('Activo corriente', b.currentAssets, '--s1')}
+              {block('Activo no corriente', b.nonCurrentAssets, '--s1', 0.75)}
+            </>
+          )}
         </div>
         <div className="col">
-          <div className="block" style={{ background: 'var(--s2)', height: h(b.currentLiabilities) }}>
-            <span>Pasivo corriente</span><b>{compact(b.currentLiabilities)}</b><span>{share(b.currentLiabilities)}</span>
-          </div>
-          <div className="block" style={{ background: 'var(--s2)', opacity: 0.75, height: h(b.nonCurrentLiabilities) }}>
-            <span>Pasivo no corriente</span><b>{compact(b.nonCurrentLiabilities)}</b><span>{share(b.nonCurrentLiabilities)}</span>
-          </div>
+          {b.currentLiabilities == null && b.nonCurrentLiabilities == null ? block('Pasivo total', b.totalLiabilities, '--s2') : (
+            <>
+              {block('Pasivo corriente', b.currentLiabilities, '--s2')}
+              {block('Pasivo no corriente', b.nonCurrentLiabilities, '--s2', 0.75)}
+            </>
+          )}
           {!negEquity && (
             <div className="block" style={{ background: 'var(--s3)', height: h(b.equity) }}>
               <span>Patrimonio neto</span><b>{compact(b.equity)}</b><span>{share(b.equity)}</span>
@@ -174,6 +214,7 @@ function EquationBar({ b, cur }: { b: BalanceRow; cur: string }) {
         <span><i style={{ background: 'var(--s2)' }} />Pasivos {compact(b.totalLiabilities, cur)}</span>
         <span><i style={{ background: 'var(--s3)' }} />Patrimonio {compact(b.equity, cur)}</span>
       </div>
+      {unclassified && <div className="note">El balance no distingue partidas corrientes y no corrientes (habitual en bancos y aseguradoras que reportan bajo IFRS).</div>}
       {negEquity && <div className="note">⚠️ Patrimonio neto negativo: los pasivos superan a los activos (frecuente en empresas con recompras agresivas de acciones).</div>}
     </>
   )
@@ -182,7 +223,7 @@ function EquationBar({ b, cur }: { b: BalanceRow; cur: string }) {
 function Structure({ d }: { d: StockDetail }) {
   const cur = d.keyStats.financialCurrency
   const b = d.balance.latest
-  if (!b) return <div className="card empty">No hay datos de balance disponibles para este activo.</div>
+  if (!b) return <NoData d={d} what="Balance" />
   const history = d.balance.history.map((r) => ({
     year: year(r.date),
     Pasivos: r.liabilitiesPct,
@@ -264,7 +305,7 @@ function Structure({ d }: { d: StockDetail }) {
 
 function CashFlow({ d }: { d: StockDetail }) {
   const cur = d.keyStats.financialCurrency
-  if (!d.cashFlow.length) return <div className="card empty">No hay datos de flujo de fondos disponibles.</div>
+  if (!d.cashFlow.length) return <NoData d={d} what="Flujo de fondos" />
   const data = d.cashFlow.map((r) => ({
     year: year(r.date),
     Operativo: r.operating,
@@ -338,7 +379,7 @@ function CashFlow({ d }: { d: StockDetail }) {
 
 function Debt({ d }: { d: StockDetail }) {
   const cur = d.keyStats.financialCurrency
-  if (!d.debt.length) return <div className="card empty">No hay datos de deuda disponibles.</div>
+  if (!d.debt.length) return <NoData d={d} what="Datos de deuda" />
   const last = d.debt.at(-1)!
   const lastKd = [...d.debt].reverse().find((r) => r.costOfDebt != null)
   const kdData = d.debt.map((r) => ({ year: year(r.date), 'Costo de deuda': r.costOfDebt, 'Costo neto de impuestos': r.afterTaxCostOfDebt }))
