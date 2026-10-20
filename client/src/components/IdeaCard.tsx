@@ -52,7 +52,7 @@ export default function IdeaCard({ idea, rank, horizon, owned }: { idea: Idea; r
       </div>
       <HorizonMeter idea={idea} active={horizon} />
       <ul className="idea-reasons">
-        {idea.reasons.map((r) => <li key={r} className={r.startsWith('Infravalorada') ? 'value' : ''}>{r}</li>)}
+        {idea.reasons.map((r) => <li key={r} className={r.startsWith('Infravalorada') ? 'undervalued' : ''}>{r}</li>)}
       </ul>
       <div className="idea-foot">
         <a href={finvizQuote(idea.symbol)} target="_blank" rel="noreferrer" className="btn ghost sm">Finviz <Icon name="external" size={13} /></a>

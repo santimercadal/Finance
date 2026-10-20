@@ -199,7 +199,7 @@ function StyleScreen() {
                 <span className="result-id">
                   <b className="num">{r.symbol}</b>
                   <span className="name">{r.name}</span>
-                  <span className="result-stats num">
+                  <span className="result-stats">
                     {dividends && <span>Div <b>{pct(r.dividendYield, 1, false)}</b></span>}
                     <span>P/E <b>{num(r.pe, 1)}</b></span>
                     {!dividends && <span>P/E fut. <b>{num(r.forwardPe, 1)}</b></span>}
