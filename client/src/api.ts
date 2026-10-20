@@ -280,6 +280,65 @@ export interface Reports {
   quarterly: { dates: string[]; rows: { label: string; key: string; values: (number | null)[] }[] }
 }
 
+export interface ScreenRow {
+  symbol: string
+  name: string
+  price: number | null
+  changePct: number | null
+  marketCap: number | null
+  volume: number | null
+  sector: string | null
+  industry: string | null
+  country: string | null
+}
+
+export interface ScreenResult { total: number; results: ScreenRow[]; source: string }
+
+export interface StyleInfo { key: string; name: string; description: string; profile: string }
+
+export interface StyleRow {
+  symbol: string
+  name: string
+  price: number
+  currency: string
+  changePct: number | null
+  marketCap: number | null
+  pe: number | null
+  forwardPe: number | null
+  dividendYield: number | null
+  yearChangePct: number | null
+  /** 1 = strong buy … 5 = sell */
+  analystScore: number | null
+  analystLabel: string | null
+}
+
+export interface StyleResult extends StyleInfo { style: string; finvizUrl: string; results: StyleRow[]; source: string }
+
+export type Horizon = 'short' | 'mid' | 'long'
+interface IdeaOutlook { direction: 'alcista' | 'bajista' | 'neutral'; score: number; signed: number }
+
+export interface Idea {
+  symbol: string
+  name: string
+  sector: string | null
+  price: number | null
+  changePct: number | null
+  marketCap: number | null
+  consensus: string
+  outlook: Record<Horizon, IdeaOutlook | null>
+  argus: { rating: string; target: number | null; upside: number | null } | null
+  valuation: { label: string; discount: string | null } | null
+  score: number
+  reasons: string[]
+}
+
+export interface Ideas {
+  updatedAt: string
+  analyzed: number
+  horizons: Record<Horizon, Idea[]>
+  sources: string[]
+}
+
 const KEY_STORAGE = 'app-key'
 export const getAppKey = () => {
   try { return localStorage.getItem(KEY_STORAGE) ?? '' } catch { return '' }
@@ -290,6 +349,8 @@ export const setAppKey = (key: string) => {
 
 // Fired when the server asks for the password, so the app can show the login screen.
 export const AUTH_EVENT = 'app-auth-required'
+// Opens the customize sheet from anywhere in the app.
+export const CUSTOMIZE_EVENT = 'app-customize'
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {

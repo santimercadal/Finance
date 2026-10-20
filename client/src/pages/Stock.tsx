@@ -15,6 +15,8 @@ import ReportsPanel from '../components/ReportsPanel'
 import FundOverview from '../components/FundOverview'
 import AnalystCard from '../components/AnalystCard'
 import Projections from '../components/Projections'
+import { finvizQuote } from '../ideas'
+import Icon from '../icons'
 
 const TABS = ['Resumen', 'Proyecciones', 'Competencia', 'Estructura patrimonial', 'Flujo de fondos', 'Deuda', 'Informes', 'Noticias'] as const
 type Tab = (typeof TABS)[number]
@@ -504,7 +506,13 @@ function StockView({ symbol }: { symbol: string }) {
             <div className="stock-head">
               <div>
                 <h1>{d.quote.name} <span className="ticker-sym">{d.symbol}</span>{d.kind !== 'equity' && <span className="chip type-chip">{d.kind === 'etf' ? 'ETF' : 'Cripto'}</span>}</h1>
-                <div className="small muted">{d.quote.exchange} · {d.quote.currency}{d.quote.marketState !== 'REGULAR' && ' · Mercado cerrado'}</div>
+                <div className="small muted">
+                  {d.quote.exchange} · {d.quote.currency}{d.quote.marketState !== 'REGULAR' && ' · Mercado cerrado'}
+                  {/* Finviz only covers US listings. */}
+                  {d.kind !== 'crypto' && !/[.=^]/.test(d.symbol) && (
+                    <> · <a href={finvizQuote(d.symbol)} target="_blank" rel="noreferrer" className="link-ext">Finviz <Icon name="external" size={12} /></a></>
+                  )}
+                </div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div className="price num">{money(d.quote.price, d.quote.currency)}</div>

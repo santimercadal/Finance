@@ -42,17 +42,22 @@ server/src/          API (Express 5, ESM, JavaScript sin build)
   ai.js              Groq (askAI, parseJsonAnswer); pausa automática tras un 429
   sec.js             SEC EDGAR (10-Q/10-K/6-K…); solo empresas que reportan ante la SEC
   etoro.js           sincronización de solo lectura con eToro
+  screener.js        buscador: filtros (screener público de Nasdaq) y estilos (pantallas predefinidas de Yahoo)
+  ideas.js           ideas de analistas por plazo (Nasdaq + Trading Central + Argus), guardadas 6 h en Upstash
+  preferences.js     preferencias (pantalla inicial, tema, orden de paneles), validadas y guardadas en storage
   util.js            num, div, ratioPct, changePct, isoDate, httpError
 client/src/          React 19 + TypeScript + Vite 8 (rolldown) + Recharts + React Router 7
-  App.tsx            rutas: / (Dashboard), /noticias, /accion/:symbol, /accion/:symbol/informe
-  api.ts             tipos de la API, fetch con x-app-key, hook de datos, AUTH_EVENT
+  App.tsx            rutas: / (Dashboard), /noticias, /ideas, /explorar, /accion/:symbol, /accion/:symbol/informe; abre la pantalla inicial elegida
+  api.ts             tipos de la API, fetch con x-app-key, hook de datos, AUTH_EVENT, CUSTOMIZE_EVENT
+  prefs.ts           tipos, paneles del inicio y contexto de preferencias (PrefsProvider en components/)
+  icons.tsx          íconos de línea compartidos (<Icon name="…" />)
   metrics.ts         catálogo de métricas: nombre, explicación, si se compara con la competencia
   format.ts          formato de dinero, porcentajes, fechas, montos grandes
   pages/             Dashboard, Stock (pestañas), News, ReportPrint (informe imprimible)
   components/        tarjetas, gráficos, diálogos, búsqueda, login
-  index.css          todo el estilo (estilo "Romer" de Stitch; tokens en :root)
+  index.css          todo el estilo: sistema "Terminal Editorial" de Stitch (Space Grotesk para texto, Space Mono para cifras); tokens en :root = oscuro, :root[data-theme='light'] = claro
 client/public/       manifest PWA, íconos, logo.svg
-design/              referencias de diseño (Stitch, Romer, logos); no se publica
+design/              referencias de diseño (Stitch: stitch/terminal-editorial/ es el diseño actual, oscuro y claro; Romer, logos); no se publica
 render.yaml          Blueprint de Render
 ```
 
@@ -64,6 +69,7 @@ render.yaml          Blueprint de Render
 - **Tipos de activo**: `kind === 'equity'` muestra todas las pestañas de `Stock.tsx`; ETF/cripto solo Resumen y Noticias (`FUND_TABS`). Si falta un estado contable se muestra un aviso, no una pestaña vacía.
 - **Seguridad**: con `APP_PASSWORD` todas las rutas `/api` (salvo `/api/health`) piden el header `x-app-key`. `/api/filing` solo descarga del archivo de la SEC y `/api/news/summary` solo de yahoo.com: no abrir proxies a URLs arbitrarias.
 - **Errores**: en las rutas usar `wrap()` y `httpError(status, mensajeEnEspañol)`.
+- **Temas claro y oscuro**: en el CSS y en los gráficos usar siempre los tokens (`var(--text)`, `color-mix(in srgb, var(--gain) 12%, transparent)`…), nunca colores fijos, y probar los dos temas. `index.html` aplica el tema guardado antes de cargar la app.
 - **Móvil primero**: probar a 375 px de ancho. Las páginas secundarias se cargan con `lazy()` y las librerías van en chunks aparte (`vite.config.ts`) para que el teléfono las mantenga en caché.
 - **Datos locales**: sin Upstash, el portafolio queda en `server/data/portfolio.json` (ignorado por git). Si no existe se crea con posiciones de ejemplo.
 

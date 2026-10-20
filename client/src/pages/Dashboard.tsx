@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Area, AreaChart, Line, ResponsiveContainer, Tooltip, YAxis } from 'recharts'
-import { api, useApi, type Holding, type Portfolio, type PortfolioHistory } from '../api'
+import { api, useApi, CUSTOMIZE_EVENT, type Holding, type Horizon, type Ideas, type NewsItem, type Portfolio, type PortfolioHistory } from '../api'
 import { compact, formatDate, money, num, pct, signedMoney, tone } from '../format'
+import { usePrefs, type PanelId } from '../prefs'
+import Icon from '../icons'
+import { HORIZONS } from '../ideas'
+import NewsList from '../components/NewsList'
+import DailyDigest from '../components/DailyDigest'
 import MarketStrip from '../components/MarketStrip'
 import ChartTip from '../components/ChartTip'
 import SymbolSearch from '../components/SymbolSearch'
@@ -98,12 +103,12 @@ function Hero({ p }: { p: Portfolio | null }) {
   const benchLast = points.at(-1)?.benchmark
   const rangeReturn = first && last ? (last / first - 1) * 100 : null
   const benchReturn = first && benchLast ? (benchLast / first - 1) * 100 : null
-  const lineColor = rangeReturn != null && rangeReturn < 0 ? 'var(--loss)' : 'var(--gain)'
+  // Portfolio line in the brand accent (the % next to it carries gain/loss color).
+  const lineColor = 'var(--primary-soft)'
   const t = p?.totals
 
   return (
     <section className="hero-card">
-      <div className="hero-glow" />
       <div className="hero-head">
         <span className="caps muted">Patrimonio total</span>
         <span className="tag num">USD · {p ? `${p.holdings.length} posiciones` : '…'}</span>
@@ -127,8 +132,8 @@ function Hero({ p }: { p: Portfolio | null }) {
             <AreaChart data={points} margin={{ top: 8, right: 4, bottom: 0, left: 4 }}>
               <defs>
                 <linearGradient id="pf" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={lineColor} stopOpacity={0.3} />
-                  <stop offset="60%" stopColor={lineColor} stopOpacity={0.06} />
+                  <stop offset="0%" stopColor={lineColor} stopOpacity={0.32} />
+                  <stop offset="70%" stopColor={lineColor} stopOpacity={0.05} />
                   <stop offset="100%" stopColor={lineColor} stopOpacity={0} />
                 </linearGradient>
               </defs>
@@ -136,7 +141,7 @@ function Hero({ p }: { p: Portfolio | null }) {
               <Tooltip content={<ChartTip format={(v) => (document.documentElement.classList.contains('privacy') ? '••••' : money(v))}
                 labelFormat={formatDate} />} />
               <Area type="monotone" dataKey="value" name="Portafolio" stroke={lineColor} strokeWidth={2.5} fill="url(#pf)" dot={false} />
-              <Line type="monotone" dataKey="benchmark" name="S&P 500" stroke="var(--primary-soft)" strokeOpacity={0.6} strokeWidth={1.25} strokeDasharray="4 3" dot={false} />
+              <Line type="monotone" dataKey="benchmark" name="S&P 500" stroke="var(--bench)" strokeOpacity={0.8} strokeWidth={1.25} strokeDasharray="4 3" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         ) : (
@@ -445,19 +450,72 @@ function Sparkline({ values }: { values?: number[] }) {
   )
 }
 
+// Latest headlines about the holdings, without article summaries.
+function HomeNews() {
+  const { data, error } = useApi<NewsItem[]>('/news?limit=4', 10 * 60_000)
+  return (
+    <section className="card home-card">
+      <div className="card-head">
+        <h2>Noticias</h2>
+        <Link to="/noticias" className="link-ext">Ver todas <Icon name="arrow" size={13} /></Link>
+      </div>
+      <DailyDigest />
+      {error && <div className="error">{error}</div>}
+      {data ? <NewsList items={data.slice(0, 4)} compact /> : !error && <div className="skeleton" style={{ height: 160 }} />}
+    </section>
+  )
+}
+
+// Top three analyst picks for the chosen horizon.
+function HomeIdeas() {
+  const { data, error } = useApi<Ideas>('/ideas')
+  const [horizon, setHorizon] = useState<Horizon>('long')
+  const list = data?.horizons[horizon].slice(0, 3) ?? []
+  return (
+    <section className="card home-card">
+      <div className="card-head">
+        <h2>Ideas de analistas</h2>
+        <Link to="/ideas" className="link-ext">Ver todas <Icon name="arrow" size={13} /></Link>
+      </div>
+      <div className="seg seg-full three" role="tablist">
+        {(Object.keys(HORIZONS) as Horizon[]).map((h) => (
+          <button key={h} role="tab" aria-selected={h === horizon} className={h === horizon ? 'on' : ''} onClick={() => setHorizon(h)}>{HORIZONS[h].label.split(' ')[0]}</button>
+        ))}
+      </div>
+      {error && <div className="error">{error}</div>}
+      {!data && !error && <div className="skeleton" style={{ height: 150 }} />}
+      <ol className="mini-ideas">
+        {list.map((i) => (
+          <li key={i.symbol}>
+            <Link to={`/accion/${encodeURIComponent(i.symbol)}`}>
+              <span className="mini-top">
+                <span className="mini-sym num">{i.symbol}</span>
+                <span className="mini-name">{i.name}</span>
+                {i.argus?.upside != null && <span className={`badge ${tone(i.argus.upside)}`}>{pct(i.argus.upside, 0)} obj.</span>}
+              </span>
+              <span className="mini-why">{i.reasons[0]}</span>
+            </Link>
+          </li>
+        ))}
+      </ol>
+      {data && list.length === 0 && <div className="empty">Sin ideas con señales alcistas para este plazo.</div>}
+    </section>
+  )
+}
+
 export default function Dashboard() {
   const portfolio = useApi<Portfolio>('/portfolio', 60_000)
   const [privacy, togglePrivacy] = usePrivacy()
   const [panel, setPanel] = useState<Panel>(null)
+  const { prefs } = usePrefs()
+  const p = portfolio.data
 
-  return (
-    <main className="dashboard">
-      <MarketStrip />
-      <StatusBar updated={portfolio.updatedAt} privacy={privacy} togglePrivacy={togglePrivacy} onRefresh={portfolio.reload} />
-      {portfolio.error && <div className="error">No se pudo cargar el portafolio: {portfolio.error}</div>}
-      <div className="dash-grid">
-        <div className="dash-main">
-          <Hero p={portfolio.data} />
+  const render = (id: PanelId) => {
+    switch (id) {
+      case 'market': return <MarketStrip />
+      case 'hero': return <Hero p={p} />
+      case 'actions': return (
+        <>
           <QuickActions panel={panel} setPanel={setPanel} />
           {panel === 'add' && <AddForm reload={portfolio.reload} onClose={() => setPanel(null)} />}
           {panel === 'import' && (
@@ -466,14 +524,29 @@ export default function Dashboard() {
               <ImportHoldings onDone={() => window.location.reload()} onCancel={() => setPanel(null)} />
             </section>
           )}
-          {portfolio.data && <KeyMetrics p={portfolio.data} />}
-          {portfolio.data && <AllocationChart holdings={portfolio.data.holdings} />}
-        </div>
-        <div className="dash-side">
-          {portfolio.data && <Positions p={portfolio.data} reload={portfolio.reload} />}
-          {portfolio.data && <ConcentrationTip p={portfolio.data} />}
-        </div>
+        </>
+      )
+      case 'news': return <HomeNews />
+      case 'ideas': return <HomeIdeas />
+      case 'metrics': return p && <KeyMetrics p={p} />
+      case 'allocation': return p && <AllocationChart holdings={p.holdings} />
+      case 'positions': return p && <Positions p={p} reload={portfolio.reload} />
+      case 'tip': return p && <ConcentrationTip p={p} />
+    }
+  }
+
+  return (
+    <main className="dashboard">
+      <StatusBar updated={portfolio.updatedAt} privacy={privacy} togglePrivacy={togglePrivacy} onRefresh={portfolio.reload} />
+      {portfolio.error && <div className="error">No se pudo cargar el portafolio: {portfolio.error}</div>}
+      <div className="dash-flow">
+        {prefs.panels.filter((x) => x.visible).map(({ id }) => (
+          <div key={id} className={`dash-panel panel-${id}`}>{render(id)}</div>
+        ))}
       </div>
+      <button className="customize-link" onClick={() => window.dispatchEvent(new Event(CUSTOMIZE_EVENT))}>
+        <Icon name="sliders" size={16} /> Personalizar inicio
+      </button>
     </main>
   )
 }

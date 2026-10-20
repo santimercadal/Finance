@@ -4,7 +4,10 @@ Dashboard personal de inversiones con datos de mercado de Yahoo Finance. Se inst
 
 ## Qué incluye
 
-- **Inicio (Portafolio)**: indicadores clave del mercado arriba de todo, KPIs del portafolio (valor, variación del día, ganancia total, mejor/peor, **beta del portafolio**), rendimiento vs. S&P 500, **distribución** por activo, tipo y sector, y la lista de posiciones.
+- **Inicio (Portafolio)**: indicadores clave del mercado, KPIs del portafolio (valor, variación del día, ganancia total, mejor/peor, **beta del portafolio**), rendimiento vs. S&P 500, **distribución** por activo, tipo y sector, la lista de posiciones, últimas noticias e ideas de analistas.
+- **Personalizar** (ícono de controles arriba a la derecha): pantalla con la que abre la app (Portafolio, Noticias, Ideas o Explorar), **tema claro, oscuro o automático**, y el **orden de los paneles del inicio** (arrastrando o con flechas) y cuáles se muestran. Se guarda en el servidor, así que el teléfono y la computadora comparten la configuración.
+- **Ideas de analistas**: acciones grandes de EE.UU. con consenso de compra, ordenadas para **corto, mediano y largo plazo** según las señales técnicas de Trading Central, la calificación y el precio objetivo de Argus y la valuación. Cada idea explica por qué está en la lista.
+- **Explorar**: búsqueda por nombre o ticker, **estilos de inversión** (crecimiento, crecimiento a buen precio, valor, dividendos, small caps agresivas, momentum, más operadas) y un **buscador con filtros** estilo Finviz (consenso de analistas, tamaño, sector, bolsa, origen). Cada pantalla y cada acción tienen un link para abrirla en [Finviz](https://finviz.com).
 - **Posiciones**: se cargan a mano, pegando una lista (`TICKER UNIDADES PRECIO_PROMEDIO`) o con el botón **Sincronizar eToro**. Antes de eliminar una posición se pide confirmación.
 - **Acciones de otros mercados** (por ejemplo europeas: `MC.PA`, `SAP.DE`): el precio se muestra en su moneda y en USD; los informes de la SEC no aplican si la empresa no reporta ante la SEC.
 - **ETF y cripto** tienen su propia vista: rendimiento total (1M a 5 años), volatilidad, caída máxima, beta, correlación con el S&P 500, ratio de Sharpe, dividendos y, cuando está disponible, costo anual (TER), patrimonio, principales posiciones y sectores.
@@ -30,7 +33,10 @@ Dashboard personal de inversiones con datos de mercado de Yahoo Finance. Se inst
 | Pros y contras de cada empresa | [Morningstar](https://www.morningstar.com) (bull/bear case), vía Yahoo Finance *insights* | Traducidos al español con IA; solo acciones con cobertura. |
 | Calificación y precio objetivo | [Argus Research](https://www.argusresearch.com), vía Yahoo Finance *insights* | |
 | Estimaciones de consenso (BPA, ingresos, precio objetivo) | Yahoo Finance — *quoteSummary*; si no está disponible, [Nasdaq](https://www.nasdaq.com) (API pública) | Nasdaq solo cubre acciones que cotizan en EE.UU. |
-| Perspectiva técnica y valuación relativa | [Trading Central](https://www.tradingcentral.com), vía Yahoo Finance *insights* | Corto, mediano y largo plazo. |
+| Perspectiva técnica y valuación relativa | [Trading Central](https://www.tradingcentral.com), vía Yahoo Finance *insights* | Corto, mediano y largo plazo. Base de las Ideas de analistas. |
+| Buscador con filtros y consenso de analistas | [Nasdaq](https://www.nasdaq.com/market-activity/stocks/screener) (buscador público) | Acciones que cotizan en EE.UU. |
+| Estilos de inversión | Yahoo Finance — pantallas predefinidas (*predefined screeners*) | Traen P/E, dividendo y consenso de analistas. |
+| Links a Finviz | [Finviz](https://finviz.com) | Solo links: Finviz no tiene API gratuita. |
 | Costo, patrimonio y composición de ETF | Yahoo Finance — *quoteSummary* | Yahoo lo bloquea para servidores en la nube: en Render puede no aparecer. |
 | Informes oficiales (10-Q, 10-K, 6-K) | [SEC EDGAR](https://www.sec.gov/edgar) | Solo empresas que reportan ante la SEC. |
 | Noticias | Yahoo Finance — búsqueda de noticias | Resúmenes y resumen del día con [Groq](https://console.groq.com) (opcional). |

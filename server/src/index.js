@@ -14,6 +14,9 @@ import { storageKind, storageWritable, getJSON, setJSON } from "./storage.js";
 import { etoroEnabled, etoroHoldings } from "./etoro.js";
 import { analystView } from "./analysts.js";
 import { stockEstimates } from "./estimates.js";
+import { screenStocks, styleScreen, styleList } from "./screener.js";
+import { analystIdeas } from "./ideas.js";
+import { loadPreferences, savePreferences } from "./preferences.js";
 import { httpError } from "./util.js";
 
 const app = express();
@@ -159,6 +162,17 @@ app.get("/api/analysts", wrap(async () => {
   const views = await Promise.all(symbols.map((s) => analystView(s)));
   return views.filter(Boolean);
 }));
+
+// Screener: filters (Nasdaq) and investment styles (Yahoo predefined screens).
+app.get("/api/screener", wrap((req) => screenStocks(req.query)));
+app.get("/api/screener/styles", wrap(() => styleList()));
+app.get("/api/screener/styles/:style", wrap((req) => styleScreen(req.params.style)));
+
+// Stocks analysts recommend for the short, mid and long term.
+app.get("/api/ideas", wrap(() => analystIdeas()));
+
+app.get("/api/preferences", wrap(() => loadPreferences()));
+app.put("/api/preferences", wrap((req) => savePreferences(req.body)));
 
 // Downloads an SEC filing document. Only the SEC archive is allowed, so this
 // can't be used to fetch arbitrary URLs through the server.
