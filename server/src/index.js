@@ -236,7 +236,12 @@ const webDist = path.join(here, "..", "..", "client", "dist");
 if (fs.existsSync(webDist)) {
   // Built files have a content hash in their name, so they never change: cache for good.
   app.use("/assets", express.static(path.join(webDist, "assets"), { immutable: true, maxAge: "1y" }));
-  app.use(express.static(webDist, { index: false, maxAge: "1h" }));
+  app.use(express.static(webDist, {
+    index: false,
+    maxAge: "1h",
+    // The service worker must be revalidated so a new deploy reaches the phone.
+    setHeaders: (res, file) => path.basename(file) === "sw.js" && res.setHeader("Cache-Control", "no-cache"),
+  }));
   // index.html is revalidated on every visit so a new deploy shows up right away.
   app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile(path.join(webDist, "index.html"), { headers: { "Cache-Control": "no-cache" } }));
 }

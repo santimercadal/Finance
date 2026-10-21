@@ -71,6 +71,7 @@ render.yaml          Blueprint de Render
 - **Errores**: en las rutas usar `wrap()` y `httpError(status, mensajeEnEspañol)`.
 - **Temas claro y oscuro**: en el CSS y en los gráficos usar siempre los tokens (`var(--text)`, `color-mix(in srgb, var(--gain) 12%, transparent)`…), nunca colores fijos, y probar los dos temas. `index.html` aplica el tema guardado antes de cargar la app.
 - **Móvil primero**: probar a 375 px de ancho. Las páginas secundarias se cargan con `lazy()` y las librerías van en chunks aparte (`vite.config.ts`) para que el teléfono las mantenga en caché.
+- **Service worker** (`vite-plugin-pwa`, en `vite.config.ts`): precachea la app y guarda las respuestas GET de `/api` (NetworkFirst, 5 s) para abrir al instante aunque el server tarde. La función `urlPattern` se copia a `sw.js`: no puede usar variables de afuera. Rutas que no deben salir de caché van en su lista de exclusión. Un monitor de UptimeRobot pinguea `/api/health` cada 5 min para que Render no se duerma.
 - **Datos locales**: sin Upstash, el portafolio queda en `server/data/portfolio.json` (ignorado por git). Si no existe se crea con posiciones de ejemplo.
 
 ## Variables de entorno
