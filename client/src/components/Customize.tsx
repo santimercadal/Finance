@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon, { type IconName } from '../icons'
 import AiUsage from './AiUsage'
+import Friends from './Friends'
+import { logout, useApi, type Me } from '../api'
 import { PANELS, START_PAGES, usePrefs, type Prefs, type StartPage, type Theme } from '../prefs'
 
 const THEMES: [Theme, string, IconName][] = [['system', 'Automático', 'auto'], ['light', 'Claro', 'sun'], ['dark', 'Oscuro', 'moon']]
@@ -65,6 +67,8 @@ function PanelList({ panels, onChange }: { panels: Prefs['panels']; onChange: (p
 export default function Customize({ onClose }: { onClose: () => void }) {
   const { prefs, update, reset } = usePrefs()
   const sheet = useRef<HTMLDivElement>(null)
+  const me = useApi<Me>('/auth/check').data
+  const owner = me?.admin !== false
 
   useEffect(() => {
     sheet.current?.focus()
@@ -115,10 +119,27 @@ export default function Customize({ onClose }: { onClose: () => void }) {
           <PanelList panels={prefs.panels} onChange={(panels) => update({ panels })} />
         </section>
 
-        <section>
-          <h3>Consumo de IA (Groq)</h3>
-          <AiUsage />
-        </section>
+        {owner && (
+          <section>
+            <h3>Consumo de IA (Groq)</h3>
+            <AiUsage />
+          </section>
+        )}
+
+        {me?.admin && me.accounts && (
+          <section>
+            <h3>Amigos</h3>
+            <p>Cada amigo entra con su nombre y su contraseña, y tiene su propio portafolio. No ve el tuyo ni tu eToro.</p>
+            <Friends />
+          </section>
+        )}
+
+        {me?.accounts && (
+          <section className="session-row">
+            <span className="small muted">Entraste como <b>{me.admin ? 'administrador' : me.name}</b></span>
+            <button className="btn sm ghost" onClick={logout}>Cerrar sesión</button>
+          </section>
+        )}
 
         <div className="customize-foot">
           <button className="btn ghost" onClick={reset}>Restablecer</button>

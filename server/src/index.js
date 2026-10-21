@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -17,6 +16,7 @@ import { stockEstimates } from "./estimates.js";
 import { screenStocks, styleScreen, styleList } from "./screener.js";
 import { analystIdeas } from "./ideas.js";
 import { loadPreferences, savePreferences } from "./preferences.js";
+import { authEnabled, userFromKey, runAs, currentUser, isAdmin, login, listUsers, createUser, resetPassword, deleteUser } from "./users.js";
 import { httpError } from "./util.js";
 
 const app = express();
@@ -24,17 +24,14 @@ app.disable("x-powered-by");
 app.set("trust proxy", 1);
 app.use(express.json({ limit: "200kb" }));
 
-// Optional password: when APP_PASSWORD is set every /api call (except health)
-// must send it in the x-app-key header. Required when the app is public.
-const PASSWORD = process.env.APP_PASSWORD ?? "";
-const sameSecret = (a, b) => {
-  const ha = crypto.createHash("sha256").update(a).digest();
-  const hb = crypto.createHash("sha256").update(b).digest();
-  return crypto.timingSafeEqual(ha, hb);
-};
-app.use("/api", (req, res, next) => {
-  if (!PASSWORD || req.path === "/health") return next();
-  if (sameSecret(String(req.get("x-app-key") ?? ""), PASSWORD)) return next();
+// Optional accounts: when APP_PASSWORD is set every /api call (except health
+// and sign-in) must send a session token in the x-app-key header, and runs as
+// that user. Required when the app is public.
+const OPEN_ROUTES = new Set(["/health", "/auth/login"]);
+app.use("/api", async (req, res, next) => {
+  if (!authEnabled || OPEN_ROUTES.has(req.path)) return next();
+  const user = await userFromKey(String(req.get("x-app-key") ?? "")).catch(() => null);
+  if (user) return runAs(user, next);
   res.status(401).json({ error: "Contraseña requerida", auth: true });
 });
 
@@ -60,9 +57,19 @@ const wrap = (fn) => async (req, res) => {
 };
 
 app.get("/api/health", async (_req, res) => {
-  res.json({ ok: true, ai: aiProvider, auth: Boolean(PASSWORD), storage: storageKind, storageWritable: await storageWritable() });
+  res.json({ ok: true, ai: aiProvider, auth: authEnabled, storage: storageKind, storageWritable: await storageWritable() });
 });
-app.get("/api/auth/check", (_req, res) => res.json({ ok: true }));
+app.get("/api/auth/check", (_req, res) => {
+  const user = currentUser();
+  res.json({ ok: true, name: user.name, admin: user.admin, accounts: authEnabled });
+});
+app.post("/api/auth/login", wrap((req) => login(req.ip, req.body?.name, req.body?.password)));
+
+// Friends' accounts (owner only).
+app.get("/api/users", wrap(() => listUsers()));
+app.post("/api/users", wrap((req) => createUser(req.body?.name)));
+app.post("/api/users/:id/password", wrap((req) => resetPassword(req.params.id)));
+app.delete("/api/users/:id", wrap((req) => deleteUser(req.params.id)));
 
 app.get("/api/market", wrap(async () => {
   const qs = await quotes(INDICATORS.map((i) => i.symbol));
@@ -129,7 +136,9 @@ app.put("/api/portfolio", wrap(async (req) => {
 }));
 
 // Replaces the portfolio with the open positions of the eToro real account.
+// The eToro keys belong to the owner: friends can't sync or see its status.
 app.post("/api/portfolio/sync/etoro", wrap(async () => {
+  if (!isAdmin()) throw httpError(403, "La sincronización con eToro es solo para el administrador");
   const { holdings: rows, skipped, shorts, cash } = await etoroHoldings();
   if (!rows.length) throw httpError(404, "La cuenta de eToro no tiene posiciones abiertas");
   const { holdings, missing } = await replaceHoldings(rows, { skipMissing: true });
@@ -142,10 +151,10 @@ app.post("/api/portfolio/sync/etoro", wrap(async () => {
     cash,
   };
 }));
-app.get("/api/portfolio/sync/etoro", wrap(async () => ({
+app.get("/api/portfolio/sync/etoro", wrap(async () => (isAdmin() ? {
   enabled: etoroEnabled,
   lastSync: await getJSON("etoro-last-sync").catch(() => null),
-})));
+} : { enabled: false, hidden: true, lastSync: null })));
 
 app.get("/api/stock/:symbol", wrap((req) => stockDetail(req.params.symbol)));
 app.get("/api/stock/:symbol/peers", wrap((req) => {

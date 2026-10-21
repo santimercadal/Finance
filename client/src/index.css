@@ -574,6 +574,7 @@ table.compare .group-row td {
 @media (min-width: 700px) { .hero-value { font-size: 44px; } .hero-chart { height: 200px; } }
 
 .quick-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.quick-actions.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .qa {
   display: grid; justify-items: center; align-content: center; gap: 8px; min-height: 76px; padding: 10px 6px;
   border: 1px solid var(--border-2); border-radius: var(--radius); background: var(--layer-1); color: var(--text);
@@ -925,3 +926,20 @@ table.compare .group-row td {
 .usage-bar.high span { background: var(--loss-strong); }
 .usage-alert { margin: 0; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--warn); font-size: 13px; }
 .ai-usage .note { margin-top: 0; }
+
+/* Friends' accounts (customize sheet, owner only) */
+.friends { display: grid; gap: 10px; }
+.friend-add { display: flex; gap: 8px; }
+.friend-add .input { flex: 1; min-width: 0; padding: 8px 12px; }
+.friend-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.friend-list li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); }
+.friend-list li > div { flex: 1; min-width: 0; display: grid; }
+.friend-list li b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn.danger-text { color: var(--loss); }
+.friend-creds { padding: 10px 12px; border: 1px solid var(--primary); border-radius: var(--radius); }
+.friend-creds p { margin: 0 0 6px; }
+.friend-creds code { font-family: var(--mono); font-size: 15px; user-select: all; }
+.friend-creds-actions { display: flex; gap: 8px; }
+.session-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* Undo the full-width buttons of .sheet inside these rows */
+.friends .btn, .session-row .btn { width: auto; margin-top: 0; flex: none; }

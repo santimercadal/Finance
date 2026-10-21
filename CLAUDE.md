@@ -42,6 +42,7 @@ server/src/          API (Express 5, ESM, JavaScript sin build)
   ai.js              Groq (askAI, parseJsonAnswer); pausa automática tras un 429
   sec.js             SEC EDGAR (10-Q/10-K/6-K…); solo empresas que reportan ante la SEC
   etoro.js           sincronización de solo lectura con eToro
+  users.js           cuentas: dueño (APP_PASSWORD) y amigos; tokens de sesión, usuario actual por pedido
   screener.js        buscador: filtros (screener público de Nasdaq) y estilos (pantallas predefinidas de Yahoo)
   ideas.js           ideas de analistas por plazo (Nasdaq + Trading Central + Argus), guardadas 6 h en Upstash
   preferences.js     preferencias (pantalla inicial, tema, orden de paneles), validadas y guardadas en storage
@@ -67,7 +68,7 @@ render.yaml          Blueprint de Render
 - **Caché**: `cached(key, ttl, fn)` en `yahoo.js` (memoria, deduplica pedidos concurrentes). Las respuestas de IA se guardan en Upstash con `recall`/`remember` (en local son no-ops) para no gastar la cuota gratuita de Groq.
 - **Monedas**: los activos pueden cotizar en otra moneda (acciones europeas, ADRs). `fxPerUsd` convierte a USD; el detalle muestra el precio en moneda nativa y en USD. En ADRs no mezclar BPA en moneda local con estimaciones en dólares.
 - **Tipos de activo**: `kind === 'equity'` muestra todas las pestañas de `Stock.tsx`; ETF/cripto solo Resumen y Noticias (`FUND_TABS`). Si falta un estado contable se muestra un aviso, no una pestaña vacía.
-- **Seguridad**: con `APP_PASSWORD` todas las rutas `/api` (salvo `/api/health`) piden el header `x-app-key`. `/api/filing` solo descarga del archivo de la SEC y `/api/news/summary` solo de yahoo.com: no abrir proxies a URLs arbitrarias.
+- **Seguridad y cuentas**: con `APP_PASSWORD` todas las rutas `/api` (salvo `/api/health` y `/api/auth/login`) piden un token en el header `x-app-key` (también se acepta la contraseña cruda, de instalaciones viejas). El dueño entra con `APP_PASSWORD`; los amigos los crea él desde Personalizar → Amigos (guardados en la clave `users`, contraseña con scrypt). Cada pedido corre como su usuario (`AsyncLocalStorage` en `users.js`): los datos propios usan `userKey("portfolio")` (el dueño conserva las claves originales, los amigos `portfolio-<id>`). eToro, el consumo de IA y la gestión de amigos son solo del dueño. Las cachés compartidas solo pueden guardar datos públicos (por símbolo), nunca algo de un usuario. `/api/filing` solo descarga del archivo de la SEC y `/api/news/summary` solo de yahoo.com: no abrir proxies a URLs arbitrarias.
 - **Errores**: en las rutas usar `wrap()` y `httpError(status, mensajeEnEspañol)`.
 - **Temas claro y oscuro**: en el CSS y en los gráficos usar siempre los tokens (`var(--text)`, `color-mix(in srgb, var(--gain) 12%, transparent)`…), nunca colores fijos, y probar los dos temas. `index.html` aplica el tema guardado antes de cargar la app.
 - **Móvil primero**: probar a 375 px de ancho. Las páginas secundarias se cargan con `lazy()` y las librerías van en chunks aparte (`vite.config.ts`) para que el teléfono las mantenga en caché.
@@ -80,7 +81,7 @@ En `server/.env` (local, ver `server/.env.example`) o en Render → *Environment
 
 | Variable | Uso |
 | --- | --- |
-| `APP_PASSWORD` | Contraseña de acceso; vacía = sin contraseña (solo local) |
+| `APP_PASSWORD` | Contraseña del dueño (administrador); vacía = sin contraseña ni cuentas (solo local). Cambiarla cierra todas las sesiones |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Base de datos; el token debe ser de escritura (`/api/health` lo verifica) |
 | `GROQ_API_KEY`, `GROQ_MODEL` | Resúmenes y traducciones con IA (por defecto `openai/gpt-oss-120b`) |
 | `GROQ_DAILY_TOKENS` | Opcional: tope diario de tokens para el indicador de consumo (si el modelo no está en la tabla de `ai.js`) |

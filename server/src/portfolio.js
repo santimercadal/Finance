@@ -1,5 +1,6 @@
 import { quotes, dailyCloses, fxPerUsd, profileOf } from "./yahoo.js";
 import { getJSON, setJSON } from "./storage.js";
+import { userKey, isAdmin } from "./users.js";
 import { betaOf } from "./company.js";
 import { changePct, daysAgo } from "./util.js";
 
@@ -10,15 +11,18 @@ const DEFAULT_HOLDINGS = [
   { symbol: "KO", shares: 20, avgCost: 60 },
 ];
 
+// Each user has their own portfolio. The owner starts with sample positions on
+// a fresh install; friends start empty.
 export async function loadHoldings() {
-  const holdings = await getJSON("portfolio");
+  const holdings = await getJSON(userKey("portfolio"));
   if (holdings) return holdings;
+  if (!isAdmin()) return [];
   await saveHoldings(DEFAULT_HOLDINGS);
   return DEFAULT_HOLDINGS;
 }
 
 export async function saveHoldings(holdings) {
-  await setJSON("portfolio", holdings);
+  await setJSON(userKey("portfolio"), holdings);
 }
 
 export async function upsertHolding({ symbol, shares, avgCost }) {

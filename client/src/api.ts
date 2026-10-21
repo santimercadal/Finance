@@ -356,12 +356,27 @@ export interface AiUsage {
   pausedUntil?: string | null
 }
 
+// Who is signed in. `accounts` is false when the server has no password.
+export interface Me { name: string; admin: boolean; accounts: boolean }
+export interface Friend { id: string; name: string; createdAt: string }
+// Returned once when a friend is created or gets a new password.
+export interface FriendCredentials { user: Friend; password: string }
+
 const KEY_STORAGE = 'app-key'
 export const getAppKey = () => {
   try { return localStorage.getItem(KEY_STORAGE) ?? '' } catch { return '' }
 }
 export const setAppKey = (key: string) => {
   try { localStorage.setItem(KEY_STORAGE, key) } catch { /* storage unavailable: key lasts for this page only */ }
+}
+
+// Forgets the session and the API answers cached on this device (another
+// person may sign in next), then shows the login screen.
+export async function logout() {
+  try { localStorage.removeItem(KEY_STORAGE) } catch { /* storage unavailable */ }
+  try { localStorage.removeItem('prefs') } catch { /* storage unavailable */ }
+  await caches?.delete('api').catch(() => false)
+  window.location.reload()
 }
 
 // Fired when the server asks for the password, so the app can show the login screen.

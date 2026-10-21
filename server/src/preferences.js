@@ -1,4 +1,5 @@
 import { getJSON, setJSON } from "./storage.js";
+import { userKey } from "./users.js";
 
 // How the user set up the app: the screen it opens on, the theme and the order
 // and visibility of the home panels. Stored on the server so the phone and the
@@ -30,11 +31,11 @@ export function cleanPreferences(p = {}) {
 }
 
 export async function loadPreferences() {
-  return cleanPreferences((await getJSON("preferences").catch(() => null)) ?? DEFAULTS);
+  return cleanPreferences((await getJSON(userKey("preferences")).catch(() => null)) ?? DEFAULTS);
 }
 
 export async function savePreferences(p) {
   const clean = cleanPreferences(p);
-  await setJSON("preferences", clean);
+  await setJSON(userKey("preferences"), clean);
   return clean;
 }

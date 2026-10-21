@@ -170,11 +170,11 @@ function Hero({ p }: { p: Portfolio | null }) {
   )
 }
 
-interface SyncStatus { enabled: boolean; lastSync: { at: string; count: number } | null }
+interface SyncStatus { enabled: boolean; hidden?: boolean; lastSync: { at: string; count: number } | null }
 interface SyncResult { count: number; skipped: string[]; shorts: number; cash: number | null }
 
 // Sync replaces the portfolio with the open positions of the eToro account
-// (read-only API keys configured on the server).
+// (read-only API keys configured on the server). Only the owner sees it.
 function QuickActions({ panel, setPanel }: { panel: Panel; setPanel: (p: Panel) => void }) {
   const status = useApi<SyncStatus>('/portfolio/sync/etoro')
   const [busy, setBusy] = useState(false)
@@ -215,14 +215,15 @@ function QuickActions({ panel, setPanel }: { panel: Panel; setPanel: (p: Panel) 
 
   const last = status.data?.lastSync
   const toggle = (p: Panel) => setPanel(panel === p ? null : p)
+  const showSync = !status.data?.hidden
   return (
     <section>
-      <div className="quick-actions">
-        <button className="qa primary" onClick={askSync} disabled={busy} aria-busy={busy}
+      <div className={`quick-actions ${showSync ? '' : 'two'}`}>
+        {showSync && <button className="qa primary" onClick={askSync} disabled={busy} aria-busy={busy}
           title={last ? `Última sincronización: ${new Date(last.at).toLocaleString('es')}` : 'Trae tus posiciones abiertas de eToro'}>
           <span className={`qa-icon ${busy ? 'spin' : ''}`}>{icon(ICONS.sync, 20)}</span>
           {busy ? 'Sincronizando…' : 'Sincronizar eToro'}
-        </button>
+        </button>}
         <button className={`qa ${panel === 'add' ? 'on' : ''}`} onClick={() => toggle('add')} aria-expanded={panel === 'add'}>
           <span className="qa-icon blue">{icon(ICONS.plus, 20)}</span>
           Agregar posición
@@ -354,7 +355,7 @@ function Positions({ p, reload }: { p: Portfolio; reload: () => void }) {
           <span className="small muted">{p.holdings.length} posiciones · tocá una para ver el análisis</span>
         </div>
       </div>
-      {p.holdings.length === 0 && <div className="card empty">Todavía no hay posiciones. Sincronizá eToro o agregá una.</div>}
+      {p.holdings.length === 0 && <div className="card empty">Todavía no hay posiciones. Agregá una o importá una lista.</div>}
       <div className="holding-list">
         {p.holdings.map((h) => (
           <div key={h.symbol} className="holding" role="link" tabIndex={0} onClick={() => open(h)}

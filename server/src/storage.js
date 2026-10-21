@@ -64,6 +64,14 @@ export async function setJSON(key, value, ttlSeconds) {
   await fs.writeFile(path.join(DATA_DIR, `${key}.json`), JSON.stringify(value, null, 2));
 }
 
+export async function delJSON(key) {
+  if (storageKind === "upstash") {
+    await redis(["DEL", key]);
+    return;
+  }
+  await fs.rm(path.join(DATA_DIR, `${key}.json`), { force: true });
+}
+
 // Long-lived cache for expensive results (AI answers) that should survive
 // restarts. Only backed by Upstash: local JSON files have no expiry, so in
 // development these are no-ops. Failures never break the caller.
