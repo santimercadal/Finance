@@ -913,3 +913,15 @@ table.compare .group-row td {
 .style-profile { font-family: var(--mono); font-size: 9px; line-height: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .style-card.on { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 9%, var(--layer-1)); }
 .style-card.on .style-profile { color: var(--primary-soft); }
+
+/* Groq usage meters (customize sheet) */
+.ai-usage { display: grid; gap: 12px; }
+.usage-row { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+.usage-row b { font-family: var(--mono); font-weight: 400; }
+.usage-meter small { display: block; margin-top: 4px; font-size: 12px; color: var(--muted); }
+.usage-bar { height: 6px; margin-top: 6px; border-radius: 3px; background: var(--grid); overflow: hidden; }
+.usage-bar span { display: block; height: 100%; background: var(--primary); transition: width .3s; }
+.usage-bar.mid span { background: var(--warn); }
+.usage-bar.high span { background: var(--loss-strong); }
+.usage-alert { margin: 0; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--warn); font-size: 13px; }
+.ai-usage .note { margin-top: 0; }

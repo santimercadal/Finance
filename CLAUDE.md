@@ -82,6 +82,7 @@ En `server/.env` (local, ver `server/.env.example`) o en Render → *Environment
 | `APP_PASSWORD` | Contraseña de acceso; vacía = sin contraseña (solo local) |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Base de datos; el token debe ser de escritura (`/api/health` lo verifica) |
 | `GROQ_API_KEY`, `GROQ_MODEL` | Resúmenes y traducciones con IA (por defecto `openai/gpt-oss-120b`) |
+| `GROQ_DAILY_TOKENS` | Opcional: tope diario de tokens para el indicador de consumo (si el modelo no está en la tabla de `ai.js`) |
 | `ETORO_API_KEY`, `ETORO_USER_KEY` | Botón Sincronizar eToro (solo lectura) |
 | `SEC_USER_AGENT` | User-Agent para SEC EDGAR (tiene valor por defecto) |
 | `PORT` | Puerto del server (3001 por defecto) |

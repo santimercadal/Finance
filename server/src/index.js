@@ -9,7 +9,7 @@ import { stockDetail, stockReports } from "./stock.js";
 import { peerComparison } from "./peers.js";
 import { isSecDocument, SEC_HEADERS } from "./sec.js";
 import { newsFeed, articleSummary, dailyDigest } from "./news.js";
-import { aiEnabled, aiProvider } from "./ai.js";
+import { aiEnabled, aiProvider, aiUsage } from "./ai.js";
 import { storageKind, storageWritable, getJSON, setJSON } from "./storage.js";
 import { etoroEnabled, etoroHoldings } from "./etoro.js";
 import { analystView } from "./analysts.js";
@@ -170,6 +170,9 @@ app.get("/api/screener/styles/:style", wrap((req) => styleScreen(req.params.styl
 
 // Stocks analysts recommend for the short, mid and long term.
 app.get("/api/ideas", wrap(() => analystIdeas()));
+
+// Groq consumption today vs. the free-tier limits.
+app.get("/api/ai/usage", wrap(() => aiUsage()));
 
 app.get("/api/preferences", wrap(() => loadPreferences()));
 app.put("/api/preferences", wrap((req) => savePreferences(req.body)));

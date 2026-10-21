@@ -339,6 +339,23 @@ export interface Ideas {
   sources: string[]
 }
 
+export interface AiUsage {
+  enabled: boolean
+  model?: string
+  today?: { requests: number; tokens: number; errors: number }
+  dailyTokenLimit?: number | null
+  limits?: {
+    at: string
+    requestsPerDay: number | null
+    requestsLeft: number | null
+    requestsReset: string | null
+    tokensPerMinute: number | null
+    tokensLeft: number | null
+    tokensReset: string | null
+  } | null
+  pausedUntil?: string | null
+}
+
 const KEY_STORAGE = 'app-key'
 export const getAppKey = () => {
   try { return localStorage.getItem(KEY_STORAGE) ?? '' } catch { return '' }

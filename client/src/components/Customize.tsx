@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon, { type IconName } from '../icons'
+import AiUsage from './AiUsage'
 import { PANELS, START_PAGES, usePrefs, type Prefs, type StartPage, type Theme } from '../prefs'
 
 const THEMES: [Theme, string, IconName][] = [['system', 'Automático', 'auto'], ['light', 'Claro', 'sun'], ['dark', 'Oscuro', 'moon']]
@@ -112,6 +113,11 @@ export default function Customize({ onClose }: { onClose: () => void }) {
           <h3>Paneles del inicio</h3>
           <p className="small">Arrastrá desde <Icon name="grip" size={14} /> o usá las flechas para ordenarlos. Apagá los que no uses.</p>
           <PanelList panels={prefs.panels} onChange={(panels) => update({ panels })} />
+        </section>
+
+        <section>
+          <h3>Consumo de IA (Groq)</h3>
+          <AiUsage />
         </section>
 
         <div className="customize-foot">
